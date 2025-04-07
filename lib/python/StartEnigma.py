@@ -30,12 +30,13 @@ from Screens.SimpleSummary import SimpleSummary
 from sys import stdout
 
 profile("Bouquets")
-from Components.config import config, configfile, ConfigText, ConfigYesNo, ConfigInteger, NoSave
-config.misc.load_unlinked_userbouquets = ConfigYesNo(default=True)
-
+from Components.config import config, configfile, ConfigText, ConfigYesNo, ConfigInteger, ConfigSelection, NoSave
+config.misc.load_unlinked_userbouquets = ConfigSelection(default="1", choices=[("0", _("Off")), ("1", _("Top")), ("2", _("Bottom"))])
+if config.misc.load_unlinked_userbouquets.value.lower() in ("true", "false"):
+	config.misc.load_unlinked_userbouquets.value = "1" if config.misc.load_unlinked_userbouquets.value.lower() == "true" else "0"
 
 def setLoadUnlinkedUserbouquets(configElement):
-	enigma.eDVBDB.getInstance().setLoadUnlinkedUserbouquets(configElement.value)
+	enigma.eDVBDB.getInstance().setLoadUnlinkedUserbouquets(int(configElement.value))
 
 
 config.misc.load_unlinked_userbouquets.addNotifier(setLoadUnlinkedUserbouquets)
@@ -58,7 +59,6 @@ InitFallbackFiles()
 profile("config.misc")
 config.misc.radiopic = ConfigText(default=resolveFilename(SCOPE_CURRENT_SKIN, "radio.mvi"))
 config.misc.blackradiopic = ConfigText(default=resolveFilename(SCOPE_CURRENT_SKIN, "black.mvi"))
-config.misc.useTransponderTime = ConfigYesNo(default=True)
 config.misc.startCounter = ConfigInteger(default=0) # number of e2 starts...
 config.misc.standbyCounter = NoSave(ConfigInteger(default=0)) # number of standby
 config.misc.DeepStandby = NoSave(ConfigYesNo(default=False)) # detect deepstandby
@@ -67,7 +67,7 @@ config.misc.prev_wakeup_time = ConfigInteger(default=0)
 #config.misc.prev_wakeup_time_type is only valid when wakeup_time is not 0
 config.misc.prev_wakeup_time_type = ConfigInteger(default=0)
 # 0 = RecordTimer, 1 = ZapTimer, 2 = Plugins, 3 = WakeupTimer
-config.misc.epgcache_filename = ConfigText(default="/hdd/epg.dat", fixed_size=False)
+config.misc.epgcache_filename = ConfigText(default="/media/hdd/epg.dat", fixed_size=False)
 
 
 def setEPGCachePath(configElement):
@@ -88,12 +88,6 @@ def setEPGCachePath(configElement):
 ####################################################
 
 
-def useTransponderTimeChanged(configElement):
-	enigma.eDVBLocalTimeHandler.getInstance().setUseDVBTime(configElement.value)
-
-
-config.misc.useTransponderTime.addNotifier(useTransponderTimeChanged)
-
 profile("Twisted")
 try:
 	import twisted.python.runtime
@@ -106,7 +100,7 @@ try:
 	def runReactor():
 		reactor.run(installSignalHandlers=False)
 except ImportError:
-	print "[StartEnigma] Twisted not available"
+	print("[StartEnigma] Twisted not available")
 
 	def runReactor():
 		enigma.runMainloop()
@@ -137,9 +131,9 @@ def dump(dir, p=""):
 				had[str(value)] = 1
 				dump(value, p + "/" + str(name))
 			else:
-				print p + "/" + str(name) + ":" + str(dir.__class__) + "(cycle)"
+				print(p + "/" + str(name) + ":" + str(dir.__class__) + "(cycle)")
 	else:
-		print p + ":" + str(dir)
+		print(p + ":" + str(dir))
 
 # + ":" + str(dir.__class__)
 
@@ -202,7 +196,7 @@ class Session:
 			try:
 				p(reason=0, session=self)
 			except:
-				print "[StartEnigma] Plugin raised exception at WHERE_SESSIONSTART"
+				print("[StartEnigma] Plugin raised exception at WHERE_SESSIONSTART")
 				import traceback
 				traceback.print_exc()
 
@@ -317,7 +311,7 @@ class Session:
 
 	def close(self, screen, *retval):
 		if not self.in_exec:
-			print "[StartEnigma] Close after exec!"
+			print("[StartEnigma] Close after exec!")
 			return
 
 		# be sure that the close is for the right dialog!
@@ -365,7 +359,7 @@ class PowerKey:
 		globalActionMap.actions["discrete_off"] = self.standby
 
 	def shutdown(self):
-		print "[StartEnigma] PowerOff - Now!"
+		print("[StartEnigma] PowerOff - Now!")
 		if not Screens.Standby.inTryQuitMainloop and self.session.current_dialog and self.session.current_dialog.ALLOW_SUSPEND:
 			self.session.open(Screens.Standby.TryQuitMainloop, 1)
 		else:
@@ -388,19 +382,19 @@ class PowerKey:
 			selected = selected.split("/")
 			if selected[0] == "Module":
 				try:
-					exec "from " + selected[1] + " import *"
-					exec "self.session.open(" + ",".join(selected[2:]) + ")"
+					exec("from " + selected[1] + " import *")
+					exec("self.session.open(" + ",".join(selected[2:]) + ")")
 				except:
-					print "[StartEnigma] Error during executing module %s, screen %s" % (selected[1], selected[2])
+					print("[StartEnigma] Error during executing module %s, screen %s" % (selected[1], selected[2]))
 			elif selected[0] == "Menu":
 				from Screens.Menu import MainMenu, mdom
 				root = mdom.getroot()
 				for x in root.findall("menu"):
-					y = x.find("id")
-					if y is not None:
-						id = y.get("val")
-						if id and id == selected[1]:
-							self.session.open(MainMenu, x)
+					if x.get("key") == "shutdown":
+						self.session.infobar = self
+						menu_screen = self.session.open(MainMenu, x)
+						menu_screen.setTitle(_("Standby / restart"))
+						break
 
 	def standby(self):
 		if not Screens.Standby.inStandby and self.session.current_dialog and self.session.current_dialog.ALLOW_SUSPEND and self.session.in_exec:
@@ -458,15 +452,16 @@ def runScreenTest():
 	session = Session(desktop=enigma.getDesktop(0), summary_desktop=enigma.getDesktop(1), navigation=nav)
 
 	CiHandler.setSession(session)
+	powerOffTimer.setSession(session)
 
-	screensToRun = [p.__call__ for p in plugins.getPlugins(PluginDescriptor.WHERE_WIZARD)]
+	screensToRun = [p.fnc for p in plugins.getPlugins(PluginDescriptor.WHERE_WIZARD)]
 
 	profile("wizards")
 	screensToRun += wizardManager.getWizards()
 
 	screensToRun.append((100, InfoBar.InfoBar))
 
-	screensToRun.sort()
+	screensToRun.sort(key=lambda x: x[0])
 
 	enigma.ePythonConfigQuery.setQueryFunc(configfile.getResolvedKey)
 
@@ -524,10 +519,9 @@ def runScreenTest():
 			wptime = nowTime + 30  # so switch back on in 30 seconds
 		else:
 			wptime = startTime[0] - 240
-		if not config.misc.useTransponderTime.value:
-			print "[StartEnigma] DVB time sync disabled... so set RTC now to current linux time!", strftime("%Y/%m/%d %H:%M", localtime(nowTime))
-			setRTCtime(nowTime)
-		print "[StartEnigma] Set wakeup time to", strftime("%Y/%m/%d %H:%M", localtime(wptime))
+		print("[StartEnigma] so set RTC now to current linux time!", strftime("%Y/%m/%d %H:%M", localtime(nowTime)))
+		setRTCtime(nowTime)
+		print("[StartEnigma] Set wakeup time to", strftime("%Y/%m/%d %H:%M", localtime(wptime)))
 		setFPWakeuptime(wptime)
 		config.misc.prev_wakeup_time.value = int(startTime[0])
 		config.misc.prev_wakeup_time_type.value = startTime[1]
@@ -543,8 +537,6 @@ def runScreenTest():
 
 	profile("configfile.save")
 	configfile.save()
-	from Screens import InfoBarGenerics
-	InfoBarGenerics.saveResumePoints()
 
 	return 0
 
@@ -581,7 +573,7 @@ keymapparser.readKeymap(config.usage.keytrans.value)
 
 profile("Network")
 import Components.Network
-Components.Network.InitNetwork()
+Components.Network.waitForNetwork()
 
 profile("LCD")
 import Components.Lcd
@@ -598,6 +590,9 @@ Screens.Ci.InitCiConfig()
 profile("RcModel")
 import Components.RcModel
 
+profile("Init:PowerOffTimer")
+from Components.PowerOffTimer import powerOffTimer
+
 #from enigma import dump_malloc_stats
 #t = eTimer()
 #t.callback.append(dump_malloc_stats)
@@ -611,8 +606,8 @@ try:
 
 	Components.ParentalControl.parentalControl.save()
 except:
-	print '[StartEnigma] EXCEPTION IN PYTHON STARTUP CODE:'
-	print '-' * 60
+	print('[StartEnigma] EXCEPTION IN PYTHON STARTUP CODE:')
+	print('-' * 60)
 	print_exc(file=stdout)
 	enigma.quitMainloop(5)
-	print '-' * 60
+	print('-' * 60)

@@ -6,6 +6,7 @@
 #include <connection.h>
 #include <map>
 #include <set>
+#include <lib/dvb/fcc.h>
 
 class eNavigation: public iObject, public sigc::trackable
 {
@@ -15,7 +16,9 @@ class eNavigation: public iObject, public sigc::trackable
 	ePtr<iServiceHandler> m_servicehandler;
 
 	ePtr<iPlayableService> m_runningService;
-	sigc::signal1<void,int> m_event;
+	eServiceReference m_runningServiceRef;
+	eServiceReference m_runningPiPServiceRef;
+	sigc::signal<void(int)> m_event;
 	ePtr<eConnection> m_service_event_conn;
 	void serviceEvent(iPlayableService* service, int event);
 
@@ -23,16 +26,23 @@ class eNavigation: public iObject, public sigc::trackable
 	std::map<ePtr<iRecordableService>, eServiceReference, std::less<iRecordableService*> > m_recordings_services;
 	std::set<ePtr<iRecordableService>, std::less<iRecordableService*> > m_simulate_recordings;
 
-	sigc::signal2<void,ePtr<iRecordableService>,int> m_record_event;
+	sigc::signal<void(ePtr<iRecordableService>,int)> m_record_event;
 	void recordEvent(iRecordableService* service, int event);
+
+	friend class eFCCServiceManager;
+	ePtr<eFCCServiceManager> m_fccmgr;
 public:
 
 	RESULT playService(const eServiceReference &service);
-	RESULT connectEvent(const sigc::slot1<void,int> &event, ePtr<eConnection> &connection);
-	RESULT connectRecordEvent(const sigc::slot2<void,ePtr<iRecordableService>,int> &event, ePtr<eConnection> &connection);
-/*	int connectServiceEvent(const sigc::slot1<void,iPlayableService*,int> &event, ePtr<eConnection> &connection); */
+	RESULT setPiPService(const eServiceReference &service);
+	RESULT connectEvent(const sigc::slot<void(int)> &event, ePtr<eConnection> &connection);
+	RESULT connectRecordEvent(const sigc::slot<void(ePtr<iRecordableService>,int)> &event, ePtr<eConnection> &connection);
+/*	int connectServiceEvent(const sigc::slot<void(iPlayableService*,int> &event, ePtr<eConnection)> &connection); */
 	RESULT getCurrentService(ePtr<iPlayableService> &service);
+	RESULT getCurrentServiceReference(eServiceReference &service);
+	RESULT getCurrentPiPServiceReference(eServiceReference &service);
 	RESULT stopService(void);
+	RESULT clearPiPService(void);
 
 	RESULT recordService(const eServiceReference &ref, ePtr<iRecordableService> &service, bool simulate=false);
 	RESULT stopRecordService(ePtr<iRecordableService> &service);

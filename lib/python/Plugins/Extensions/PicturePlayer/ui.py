@@ -11,7 +11,7 @@ from Components.AVSwitch import AVSwitch
 from Components.Sources.List import List
 from Components.ConfigList import ConfigList, ConfigListScreen
 
-from Components.config import config, ConfigSubsection, ConfigInteger, ConfigSelection, ConfigText, ConfigYesNo, KEY_LEFT, KEY_RIGHT, getConfigListEntry
+from Components.config import config, ConfigSubsection, ConfigInteger, ConfigSelection, ConfigText, ConfigYesNo, KEY_LEFT, KEY_RIGHT
 from skin import applySkinFactor, parameters
 
 
@@ -49,6 +49,7 @@ class picshow(Screen):
 
 	def __init__(self, session):
 		Screen.__init__(self, session)
+		self.setTitle(_("Picture player"))
 
 		self["actions"] = ActionMap(["OkCancelActions", "ColorActions", "DirectionActions", "MenuActions"],
 		{
@@ -124,7 +125,6 @@ class picshow(Screen):
 			self.session.openWithCallback(self.callbackView, Pic_Full_View, self.filelist.getFileList(), self.filelist.getSelectionIndex(), self.filelist.getCurrentDirectory())
 
 	def setConf(self, retval=None):
-		self.setTitle(_("Picture player"))
 		sc = getScale()
 		#0=Width 1=Height 2=Aspect 3=use_cache 4=resize_type 5=Background(#AARRGGBB)
 		self.picload.setPara((self["thn"].instance.size().width(), self["thn"].instance.size().height(), sc[0], sc[1], config.pic.cache.value, int(config.pic.resize.value), "#00000000", config.pic.autoOrientation.value))
@@ -144,73 +144,29 @@ class picshow(Screen):
 		config.pic.save()
 		self.close()
 
-#------------------------------------------------------------------------------------------
 
-
-class Pic_Setup(Screen, ConfigListScreen):
+class Pic_Setup(ConfigListScreen, Screen):
 
 	def __init__(self, session):
 		Screen.__init__(self, session)
 		# for the skin: first try MediaPlayerSettings, then Setup, this allows individual skinning
 		self.skinName = ["PicturePlayerSetup", "Setup"]
-		self.setup_title = _("Settings")
-		self.onChangedEntry = []
-		self.session = session
-		ConfigListScreen.__init__(self, [], session=session, on_change=self.changedEntry)
-		self["actions"] = ActionMap(["SetupActions", "MenuActions"],
-			{
-				"cancel": self.keyCancel,
-				"save": self.keySave,
-				"ok": self.keySave,
-				"menu": self.closeRecursive,
-			}, -2)
-		self["key_red"] = StaticText(_("Cancel"))
-		self["key_green"] = StaticText(_("OK"))
-		self.createSetup()
-		self.onLayoutFinish.append(self.layoutFinished)
+		self.setTitle(_("Settings"))
 
-	def layoutFinished(self):
-		self.setTitle(self.setup_title)
-
-	def createSetup(self):
 		setup_list = [
-			getConfigListEntry(_("Slide show interval (sec.)"), config.pic.slidetime),
-			getConfigListEntry(_("Scaling mode"), config.pic.resize),
-			getConfigListEntry(_("Cache thumbnails"), config.pic.cache),
-			getConfigListEntry(_("Show info line"), config.pic.infoline),
-			getConfigListEntry(_("Frame size in full view"), config.pic.framesize),
-			getConfigListEntry(_("Slide picture in loop"), config.pic.loop),
-			getConfigListEntry(_("Background color"), config.pic.bgcolor),
-			getConfigListEntry(_("Text color"), config.pic.textcolor),
-			getConfigListEntry(_("Full view resolution"), config.usage.pic_resolution),
-			getConfigListEntry(_("Auto EXIF Orientation rotation/flipping"), config.pic.autoOrientation),
-			getConfigListEntry(_("Stop play TV"), config.pic.stopPlayTv),
+			(_("Slide show interval (sec.)"), config.pic.slidetime),
+			(_("Scaling mode"), config.pic.resize),
+			(_("Cache thumbnails"), config.pic.cache),
+			(_("Show info line"), config.pic.infoline),
+			(_("Frame size in full view"), config.pic.framesize),
+			(_("Slide picture in loop"), config.pic.loop),
+			(_("Background color"), config.pic.bgcolor),
+			(_("Text color"), config.pic.textcolor),
+			(_("Full view resolution"), config.usage.pic_resolution),
+			(_("Auto EXIF Orientation rotation/flipping"), config.pic.autoOrientation),
+			(_("Stop play TV"), config.pic.stopPlayTv),
 		]
-		self["config"].list = setup_list
-		self["config"].l.setList(setup_list)
-
-	def keyLeft(self):
-		ConfigListScreen.keyLeft(self)
-
-	def keyRight(self):
-		ConfigListScreen.keyRight(self)
-
-	# for summary:
-	def changedEntry(self):
-		for x in self.onChangedEntry:
-			x()
-
-	def getCurrentEntry(self):
-		return self["config"].getCurrent()[0]
-
-	def getCurrentValue(self):
-		return str(self["config"].getCurrent()[1].getText())
-
-	def createSummary(self):
-		from Screens.Setup import SetupSummary
-		return SetupSummary
-
-#---------------------------------------------------------------------------
+		ConfigListScreen.__init__(self, setup_list, session, fullUI=True)
 
 
 class Pic_Exif(Screen):
@@ -231,6 +187,7 @@ class Pic_Exif(Screen):
 
 	def __init__(self, session, exiflist):
 		Screen.__init__(self, session)
+		self.setTitle(_("Info"))
 
 		self["actions"] = ActionMap(["SetupActions", "ColorActions"],
 		{
@@ -249,12 +206,6 @@ class Pic_Exif(Screen):
 				name = exiflist[x].split('/')[-1]
 				list.append((exifdesc[x], name))
 		self["menu"] = List(list)
-		self.onLayoutFinish.append(self.layoutFinished)
-
-	def layoutFinished(self):
-		self.setTitle(_("Info"))
-
-#----------------------------------------------------------------------------------------
 
 
 T_INDEX = 0
@@ -275,8 +226,8 @@ class Pic_Thumb(Screen):
 
 		size_w = getDesktop(0).size().width()
 		size_h = getDesktop(0).size().height()
-		self.thumbsX = size_w / (self.spaceX + self.picX) # thumbnails in X
-		self.thumbsY = size_h / (self.spaceY + self.picY) # thumbnails in Y
+		self.thumbsX = size_w // (self.spaceX + self.picX) # thumbnails in X
+		self.thumbsY = size_h // (self.spaceY + self.picY) # thumbnails in Y
 		self.thumbsC = self.thumbsX * self.thumbsY # all thumbnails
 
 		self.positionlist = []
@@ -284,7 +235,7 @@ class Pic_Thumb(Screen):
 
 		posX = -1
 		for x in range(self.thumbsC):
-			posY = x / self.thumbsX
+			posY = x // self.thumbsX
 			posX += 1
 			if posX >= self.thumbsX:
 				posX = 0
@@ -445,8 +396,6 @@ class Pic_Thumb(Screen):
 		del self.picload
 		self.close(self.index + self.dirlistcount)
 
-#---------------------------------------------------------------------------
-
 
 class Pic_Full_View(Screen):
 	def __init__(self, session, filelist, index, path):
@@ -585,7 +534,7 @@ class Pic_Full_View(Screen):
 			self.index = self.maxentry
 
 	def slidePic(self):
-		print "slide to next Picture index=" + str(self.lastindex)
+		print("slide to next Picture index=" + str(self.lastindex))
 		if config.pic.loop.value == False and self.lastindex == self.maxentry:
 			self.PlayPause()
 		self.shownow = True

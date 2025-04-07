@@ -34,6 +34,9 @@ void eDVBCI_UI::gotMessage(const eDVBCIInterfaces::Message &message)
 		case eDVBCIInterfaces::Message::slotStateChanged:
 			setState(message.m_slotid, message.m_state);
 			break;
+		case eDVBCIInterfaces::Message::slotDecodingStateChanged:
+			setDecodingState(message.m_slotid, message.m_state);
+			break;
 		case eDVBCIInterfaces::Message::mmiSessionDestroyed:
 			mmiSessionDestroyed(message.m_slotid);
 			break;
@@ -94,6 +97,11 @@ int eDVBCI_UI::getMMIState(int slot)
 int eDVBCI_UI::setClockRate(int slot, int rate)
 {
 	return eDVBCIInterfaces::getInstance()->setCIClockRate(slot, rate);
+}
+
+int eDVBCI_UI::setEnabled(int slot, bool enabled)
+{
+	return eDVBCIInterfaces::getInstance()->setCIEnabled(slot, enabled);
 }
 
 //FIXME: correct "run/startlevel"

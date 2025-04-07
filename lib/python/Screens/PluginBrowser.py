@@ -1,4 +1,4 @@
-from Screen import Screen
+from Screens.Screen import Screen
 from Screens.ParentalControlSetup import ProtectedScreen
 from enigma import eConsoleAppContainer, eDVBDB, eTimer
 
@@ -11,13 +11,13 @@ from Components.Language import language
 from Components.ServiceList import refreshServiceList
 from Components.Harddisk import harddiskmanager
 from Components.Sources.StaticText import StaticText
-from Components.SystemInfo import SystemInfo, hassoftcaminstalled
+from Components.SystemInfo import BoxInfo, hassoftcaminstalled
 from Components import Opkg
 from Screens.MessageBox import MessageBox
 from Screens.ChoiceBox import ChoiceBox
 from Screens.Console import Console
 from Plugins.Plugin import PluginDescriptor
-from Tools.Directories import resolveFilename, SCOPE_PLUGINS, SCOPE_CURRENT_SKIN
+from Tools.Directories import fileExists, resolveFilename, SCOPE_PLUGINS, SCOPE_CURRENT_SKIN
 from Tools.LoadPixmap import LoadPixmap
 
 from time import time
@@ -59,6 +59,7 @@ class PluginBrowser(Screen, ProtectedScreen):
 
 		self["key_red"] = self["red"] = Label(_("Remove plugins"))
 		self["key_green"] = self["green"] = Label(_("Download plugins"))
+		self["key_menu"] = StaticText(_("MENU"))
 		self.list = []
 		self["list"] = PluginList(self.list)
 
@@ -137,7 +138,7 @@ class PluginBrowser(Screen, ProtectedScreen):
 		if len(plugins.warnings):
 			text = _("Some plugins are not available:\n")
 			for (pluginname, error) in plugins.warnings:
-				text += _("%s (%s)\n") % (pluginname, error)
+				text += "%s (%s)\n" % (pluginname, error)
 			plugins.resetWarnings()
 			self.session.open(MessageBox, text=text, type=MessageBox.TYPE_WARNING)
 
@@ -233,9 +234,14 @@ class PluginBrowser(Screen, ProtectedScreen):
 		self.session.openWithCallback(self.PluginDownloadBrowserClosed, PluginDownloadBrowser, PluginDownloadBrowser.DOWNLOAD, self.firsttime)
 		self.firsttime = False
 
-	def PluginDownloadBrowserClosed(self):
-		self.updateList()
-		self.checkWarnings()
+	def PluginDownloadBrowserClosed(self, returnValue):
+		if returnValue == None:
+			self.updateList()
+			self.checkWarnings()
+		elif returnValue == 0:
+			self.download()
+		else:
+			self.delete()
 
 	def openExtensionmanager(self):
 		if fileExists(resolveFilename(SCOPE_PLUGINS, "SystemPlugins/SoftwareManager/plugin.py")):
@@ -263,7 +269,7 @@ class PluginDownloadBrowser(Screen):
 		self.container.appClosed.append(self.runFinished)
 		self.container.dataAvail.append(self.dataAvail)
 		self.onLayoutFinish.append(self.startRun)
-		self.setTitle(self.type == self.DOWNLOAD and _("Downloadable new plugins") or _("Remove plugins"))
+		self.setTitle(_("Downloadable new plugins") if self.type == self.DOWNLOAD else _("Remove plugins"))
 		self.list = []
 		self["list"] = PluginList(self.list)
 		self.pluginlist = []
@@ -275,7 +281,10 @@ class PluginDownloadBrowser(Screen):
 		self.check_settings = False
 		self.install_settings_name = ''
 		self.remove_settings_name = ''
-		self["text"] = Label(self.type == self.DOWNLOAD and _("Downloading plugin information. Please wait...") or _("Getting plugin information. Please wait..."))
+		self["text"] = Label(_("Downloading plugin information. Please wait...") if self.type == self.DOWNLOAD else _("Getting plugin information. Please wait..."))
+		self["key_red"] = Label(_("Cancel"))
+		self["key_green"] = Label(_("Expand"))
+		self["key_blue"] = Label(_("Remove plugins") if self.type == self.DOWNLOAD else _("Download plugins"))
 		self.run = 0
 		self.remainingdata = ""
 		self["actions"] = ActionMap(["WizardActions"],
@@ -283,6 +292,11 @@ class PluginDownloadBrowser(Screen):
 			"ok": self.go,
 			"back": self.requestClose,
 		})
+		self["PluginDownloadActions"] = ActionMap(["ColorActions"], {
+			"blue": self.delete if self.type == self.DOWNLOAD else self.download,
+			"red": self.requestClose,
+			"green": self.go}
+		)
 		if os.path.isfile('/usr/bin/opkg'):
 			self.opkg = '/usr/bin/opkg'
 			self.opkg_install = self.opkg + ' install'
@@ -291,27 +305,40 @@ class PluginDownloadBrowser(Screen):
 			self.opkg = 'opkg'
 			self.opkg_install = 'opkg install -force-defaults'
 			self.opkg_remove = self.opkg + ' remove'
+		self["list"].onSelectionChanged.append(self.selectionChanged)
+
+	def selectionChanged(self):
+		selection = self["list"].l.getCurrentSelection()
+		if selection:
+			selection = selection[0]
+			if isinstance(selection, str): # category
+				self["key_green"].text = _("Collapse") if selection in self.expanded else _("Expand")
+			else:
+				self["key_green"].text = _("Install plugin") if self.type == self.DOWNLOAD else _("Remove plugin")
 
 	def go(self):
-		sel = self["list"].l.getCurrentSelection()
-
-		if sel is None:
-			return
-
-		sel = sel[0]
-		if isinstance(sel, str): # category
-			if sel in self.expanded:
-				self.expanded.remove(sel)
+		selection = self["list"].l.getCurrentSelection()
+		if selection:
+			selection = selection[0]
+			if isinstance(selection, str): # category
+				if selection in self.expanded:
+					self.expanded.remove(selection)
+				else:
+					self.expanded.append(selection)
+				self.updateList()
 			else:
-				self.expanded.append(sel)
-			self.updateList()
-		else:
-			if self.type == self.DOWNLOAD:
-				self.session.openWithCallback(self.runInstall, MessageBox, _("Do you really want to download\nthe plugin \"%s\"?") % sel.name)
-			elif self.type == self.REMOVE:
-				self.session.openWithCallback(self.runInstall, MessageBox, _("Do you really want to remove\nthe plugin \"%s\"?") % sel.name)
+				if self.type == self.DOWNLOAD:
+					self.session.openWithCallback(self.runInstall, MessageBox, _("Do you really want to download\nthe plugin \"%s\"?") % selection.name)
+				elif self.type == self.REMOVE:
+					self.session.openWithCallback(self.runInstall, MessageBox, _("Do you really want to remove\nthe plugin \"%s\"?") % selection.name)
 
-	def requestClose(self):
+	def delete(self):
+		self.requestClose(1)
+
+	def download(self):
+		self.requestClose(0)
+
+	def requestClose(self, returnValue=None):
 		if self.plugins_changed:
 			plugins.readPluginList(resolveFilename(SCOPE_PLUGINS))
 		if self.reload_settings:
@@ -322,11 +349,11 @@ class PluginDownloadBrowser(Screen):
 			parentalControl.open()
 			refreshServiceList()
 		if self.check_softcams:
-			SystemInfo["HasSoftcamInstalled"] = hassoftcaminstalled()
+			BoxInfo.setItem("HasSoftcamInstalled", hassoftcaminstalled())
 		plugins.readPluginList(resolveFilename(SCOPE_PLUGINS))
 		self.container.appClosed.remove(self.runFinished)
 		self.container.dataAvail.remove(self.dataAvail)
-		self.close()
+		self.close(returnValue)
 
 	def resetPostInstall(self):
 		try:
@@ -415,8 +442,8 @@ class PluginDownloadBrowser(Screen):
 		if hasattr(self, 'postInstallCall'):
 			try:
 				self.postInstallCall()
-			except Exception, ex:
-				print "[PluginBrowser] postInstallCall failed:", ex
+			except Exception as ex:
+				print("[PluginBrowser] postInstallCall failed:", ex)
 			self.resetPostInstall()
 		try:
 			os.unlink('/tmp/opkg.conf')
@@ -455,19 +482,21 @@ class PluginDownloadBrowser(Screen):
 			if pluginlist:
 				pluginlist.sort()
 				self.updateList()
+				self["text"].instance.hide()
 				self["list"].instance.show()
 			else:
 				self["text"].setText(_("No new plugins found"))
 		else:
 			if self.pluginlist:
 				self.updateList()
+				self["text"].instance.hide()
 				self["list"].instance.show()
 			else:
 				self["text"].setText(_("No new plugins found"))
 
 	def dataAvail(self, str):
 		#prepend any remaining data from the previous call
-		str = self.remainingdata + str
+		str = self.remainingdata + str.decode()
 		#split in lines
 		lines = str.split('\n')
 		#'str' should end with '\n', so when splitting, the last line should be empty. If this is not the case, we received an incomplete line

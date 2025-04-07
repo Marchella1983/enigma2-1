@@ -48,6 +48,7 @@ class eDVBCISlot: public iObject, public sigc::trackable
 	int slotid;
 	int fd;
 	ePtr<eSocketNotifier> notifier;
+	ePtr<eTimer> startup_timeout;
 	int state;
 	int m_ci_version;
 	std::map<uint16_t, uint8_t> running_services;
@@ -66,13 +67,36 @@ class eDVBCISlot: public iObject, public sigc::trackable
 	bool user_mapped;
 	void data(int);
 	bool plugged;
+	bool m_isCamMgrRoutingActive;
+	bool m_ciPlusRoutingDone;
+	int16_t m_ca_demux_id;
+	uint16_t m_program_number;
+	int m_video_pid;
+	int m_audio_pid;
+	int m_audio_number;
+	int m_audio_pids[16];
+	int m_tunernum;
+	eMainloop *m_context;
+	int m_ciplus_routing_tunernum;
+	bool m_operator_profiles_disabled;
+	bool m_ca0_excluded;
+	std::string m_ciplus_routing_input;
+	std::string m_ciplus_routing_ci_input;
 
 	eDVBCIApplicationManagerSession *getAppManager() { return application_manager; }
 	eDVBCIMMISession *getMMIManager() { return mmi_session; }
 	eDVBCICAManagerSession *getCAManager() { return ca_manager; }
 	eDVBCICcSession *getCCManager() { return cc_manager; }
 
-	int getState() { return state; }
+	int getState() { return state; };
+	void setCamMgrRoutingActive(bool active) { m_isCamMgrRoutingActive= active; };
+	bool isCamMgrRoutingActive() { return m_isCamMgrRoutingActive; };
+	bool ciplusRoutingDone() { return m_ciPlusRoutingDone; };
+	void setCIPlusRoutingDone() { m_ciPlusRoutingDone = true; };
+	int getCIPlusRoutingTunerNum() { return m_ciplus_routing_tunernum; };
+	std::string getCIPlusRoutingInput() { return m_ciplus_routing_input; };
+	std::string getCIPlusRoutingCIInput() { return m_ciplus_routing_ci_input; };
+	void setCIPlusRoutingParameter(int tunernum, std::string ciplus_routing_input, std::string ciplus_routing_ci_input);
 	int reset();
 	int startMMI();
 	int stopMMI();
@@ -81,16 +105,20 @@ class eDVBCISlot: public iObject, public sigc::trackable
 	int cancelEnq();
 	int getMMIState();
 	int sendCAPMT(eDVBServicePMTHandler *ptr, const std::vector<uint16_t> &caids=std::vector<uint16_t>());
+	int setCaParameter(eDVBServicePMTHandler *pmthandler);
 	void removeService(uint16_t program_number=0xFFFF);
 	int setSource(const std::string &source);
 	int setClockRate(int);
 	void determineCIVersion();
+	int setEnabled(bool);
 	static std::string getTunerLetter(int tuner_no) { return std::string(1, char(65 + tuner_no)); }
 public:
-	enum {stateRemoved, stateInserted, stateInvalid, stateResetted};
+	enum {stateRemoved, stateInserted, stateInvalid, stateResetted, stateDisabled};
 	enum {versionUnknown = -1, versionCI = 0, versionCIPlus1 = 1, versionCIPlus2 = 2};
 	eDVBCISlot(eMainloop *context, int nr);
 	~eDVBCISlot();
+	void closeDevice();
+	void openDevice();
 
 	int send(const unsigned char *data, size_t len);
 
@@ -99,9 +127,20 @@ public:
 	void setCAManager( eDVBCICAManagerSession *session );
 	void setCCManager( eDVBCICcSession *session );
 
+	int getFd() { return fd; };
 	int getSlotID();
 	int getNumOfServices();
 	int getVersion();
+	bool getIsOperatorProfileDisabled() { return m_operator_profiles_disabled; };
+	bool getIsCA0Excluded() { return m_ca0_excluded; };
+	int16_t getCADemuxID() { return m_ca_demux_id; };
+	int getTunerNum() { return m_tunernum; };
+	int getUseCount() { return use_count; };
+	int getProgramNumber() { return (int)m_program_number; };
+	int getVideoPid() { return m_video_pid; };
+	int getAudioPid() { return m_audio_pid; };
+	int getAudioNumber() { return m_audio_number; };
+	int* getAudioPids() { return m_audio_pids; };
 };
 
 struct CIPmtHandler
@@ -156,10 +195,6 @@ private:
 	eFixedMessagePump<int> m_messagepump_main; // message handling in the e2 mainloop
 	ePtr<eTimer> m_runTimer; // workaround to interrupt thread mainloop as some ci drivers don't implement poll properly
 	static pthread_mutex_t m_pmt_handler_lock;
-	bool m_ciplus_routing_active;
-	int m_ciplus_routing_tunernum;
-	std::string m_ciplus_routing_input;
-	std::string m_ciplus_routing_ci_input;
 
 	int sendCAPMT(int slot);
 
@@ -183,6 +218,7 @@ public:
 	void ciRemoved(eDVBCISlot *slot);
 	int getSlotState(int slot);
 
+	int setCIEnabled(int slot, bool enabled);
 	int reset(int slot);
 	int initialize(int slot);
 	int startMMI(int slot);
@@ -212,7 +248,8 @@ public:
 			slotStateChanged,
 			mmiSessionDestroyed,
 			mmiDataReceived,
-			appNameChanged
+			appNameChanged,
+			slotDecodingStateChanged
 		};
 		int m_type;
 		int m_slotid;

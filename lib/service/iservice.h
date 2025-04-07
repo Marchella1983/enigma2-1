@@ -49,13 +49,22 @@ public:
 	int flags; // flags will NOT be compared.
 
 	inline int getSortKey() const { return (flags & hasSortKey) ? data[3] : ((flags & sort1) ? 1 : 0); }
+	static RESULT parseNameAndProviderFromName(std::string &sourceName, std::string& name, std::string& prov);
 
 #ifndef SWIG
 	int data[8];
 	std::string path;
+	std::string compareSref;
+	bool isStreamRelay = false;
+	std::string suburi;
 #endif
 	std::string getPath() const { return path; }
 	void setPath( const std::string &n ) { path=n; }
+	void setCompareSref( const std::string &n, bool isSR = false) { compareSref=n; isStreamRelay=isSR; }
+	bool getStreamRelay() const { return isStreamRelay; }
+	std::string getCompareSref() const { return compareSref; }
+	
+	void setSubUri( const std::string &n ) { suburi=n; }
 
 	unsigned int getUnsignedData(unsigned int num) const
 	{
@@ -87,10 +96,13 @@ public:
 // real existing service ( for dvb eServiceDVB )
 #ifndef SWIG
 	std::string name;
+	std::string prov;
 	int number;
 #endif
 	std::string getName() const { return name; }
-	void setName( const std::string &n ) { name=n; }
+	std::string getProvider() const { return prov; }
+	void setName( const std::string &s ) { name=s; }
+	void setProvider( const std::string &s ) { prov=s; }
 	int getChannelNum() const { return number; }
 	void setChannelNum(const int n) { number = n; }
 
@@ -168,9 +180,9 @@ public:
 	std::string toCompareString() const;
 	bool operator==(const eServiceReference &c) const
 	{
-		if (type != c.type)
+		if (!c || type != c.type)
 			return 0;
-		return (memcmp(data, c.data, sizeof(int)*8)==0) && (path == c.path);
+		return ((memcmp(data, c.data, sizeof(int)*8)==0) && (path == c.path)) || (!c.compareSref.empty() && toString() == c.compareSref) || (!compareSref.empty() && compareSref == c.toString());
 	}
 	bool operator!=(const eServiceReference &c) const
 	{
@@ -178,6 +190,8 @@ public:
 	}
 	bool operator<(const eServiceReference &c) const
 	{
+		if (!c) return 0;
+		
 		if (type < c.type)
 			return 1;
 
@@ -452,6 +466,7 @@ public:
 		syncState,
 		frontendNumber,
 		signalQualitydB,
+		isUsbTuner,
 		frontendStatus,
 		snrValue,
 		frequency,
@@ -948,6 +963,8 @@ public:
 
 		evVideoGammaChanged,
 
+		evFccFailed,
+
 		evUser = 0x100
 	};
 };
@@ -962,7 +979,7 @@ class iPlayableService: public iPlayableService_ENUMS, public iObject
 	friend class iServiceHandler;
 public:
 #ifndef SWIG
-	virtual RESULT connectEvent(const sigc::slot2<void,iPlayableService*,int> &event, ePtr<eConnection> &connection)=0;
+	virtual RESULT connectEvent(const sigc::slot<void(iPlayableService*,int)> &event, ePtr<eConnection> &connection)=0;
 #endif
 	virtual RESULT start()=0;
 	virtual RESULT stop()=0;
@@ -1006,6 +1023,8 @@ public:
 		evRecordFailed,
 		evRecordWriteError,
 		evNewEventInfo,
+		evTuneStart,
+		evPvrTuneStart,
 		evRecordAborted,
 		evGstRecordEnded,
 	};
@@ -1030,7 +1049,7 @@ class iRecordableService: public iRecordableService_ENUMS, public iObject
 #endif
 public:
 #ifndef SWIG
-	virtual RESULT connectEvent(const sigc::slot2<void,iRecordableService*,int> &event, ePtr<eConnection> &connection)=0;
+	virtual RESULT connectEvent(const sigc::slot<void(iRecordableService*,int)> &event, ePtr<eConnection> &connection)=0;
 #endif
 	virtual SWIG_VOID(RESULT) getError(int &SWIG_OUTPUT)=0;
 	virtual RESULT prepare(const char *filename, time_t begTime=-1, time_t endTime=-1, int eit_event_id=-1, const char *name=0, const char *descr=0, const char *tags=0, bool descramble = true, bool recordecm = false, int packetsize = 188)=0;

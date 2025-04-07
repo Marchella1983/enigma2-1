@@ -1,6 +1,6 @@
 from Components.VariableText import VariableText
-from enigma import eLabel, iServiceInformation
-from Renderer import Renderer
+from enigma import eLabel, iServiceInformation, eServiceReference
+from Components.Renderer.Renderer import Renderer
 
 #
 # borrowed from vali, addapter for openpli
@@ -16,7 +16,8 @@ class VideoSize(Renderer, VariableText):
 
 	def changed(self, what):
 		service = self.source.service
-		info = service and service.info()
+		isRef = isinstance(service, eServiceReference)
+		info = service.info() if (service and not isRef) else None
 		if info is None:
 			self.text = ""
 			return

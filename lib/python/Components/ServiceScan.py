@@ -12,7 +12,7 @@ class ServiceScan:
 	DonePartially = 5
 
 	Errors = {
-		0: _("error starting scanning"),
+		0: _("error starting scan"),
 		1: _("error while scanning"),
 		2: _("no resource manager"),
 		3: _("no channel list")
@@ -125,13 +125,13 @@ class ServiceScan:
 								tp.Bandwidth_1_712MHz: "Bw 1.712MHz", tp.Bandwidth_10MHz: "Bw 10MHz"
 							}.get(tp.bandwidth, ""))
 					elif tp_type == iDVBFrontend.feATSC:
-						network = _("ATSC")
+						network = "ATSC"
 						tp = transponder.getATSC()
 						freqMHz = "%0.1f MHz" % (tp.frequency / 1000000.)
 						tp_text = ("%s %s %s %s") % (
 							{
-								tp.System_ATSC: _("ATSC"),
-								tp.System_DVB_C_ANNEX_B: _("DVB-C ANNEX B")
+								tp.System_ATSC: "ATSC",
+								tp.System_DVB_C_ANNEX_B: "DVB-C ANNEX B"
 							}.get(tp.system, ""),
 							{
 								tp.Modulation_Auto: _("Auto"),
@@ -150,7 +150,7 @@ class ServiceScan:
 								tp.Inversion_Unknown: _("Auto")
 							}.get(tp.inversion, ""))
 					else:
-						print "unknown transponder type in scanStatusChanged"
+						print("unknown transponder type in scanStatusChanged")
 				self.network.setText(network)
 				self.transponder.setText(tp_text)
 
@@ -217,7 +217,7 @@ class ServiceScan:
 	def execEnd(self):
 		if self.scan is None:
 			if not self.isDone():
-				print "*** warning *** scan was not finished!"
+				print("*** warning *** scan was not finished!")
 			return
 		self.scan.statusChanged.get().remove(self.scanStatusChanged)
 		self.scan.newService.get().remove(self.newService)

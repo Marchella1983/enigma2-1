@@ -1,4 +1,4 @@
-from Source import Source
+from Components.Sources.Source import Source
 from Components.Element import cached
 from enigma import eTimer
 
@@ -11,7 +11,7 @@ from enigma import eTimer
 # into a seperate Source, providing a "boolean"-property.
 
 
-class Boolean(Source, object):
+class Boolean(Source):
 	def __init__(self, fixed=False, function=None, destroy=None, poll=0):
 		Source.__init__(self)
 		self.function = function

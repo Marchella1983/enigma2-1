@@ -7,7 +7,7 @@ from Tools.Transponder import ConvertToHumanReadable
 import Screens.InfoBar
 
 
-class TransponderInfo(Converter, object):
+class TransponderInfo(Converter):
 	def __init__(self, type):
 		Converter.__init__(self, type)
 		self.type = type.split(";")
@@ -35,7 +35,7 @@ class TransponderInfo(Converter, object):
 			ref = info.getInfoString(iServiceInformation.sServiceref)
 		if transponderraw:
 			transponderdata = ConvertToHumanReadable(transponderraw)
-			# retreive onid and tsid from service reference
+			# retrieve onid and tsid from service reference
 			[onid, tsid] = [int(x, 16) for x in ref.split(':')[4:6]]
 			if not transponderdata["system"]:
 				transponderdata["system"] = transponderraw.get("tuner_type", "None")

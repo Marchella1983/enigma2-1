@@ -50,7 +50,7 @@ class Opkg(Screen):
 			self.runningCmd = 0
 		else:
 			self.runningCmd += 1
-		print len(self.cmdList), self.runningCmd
+		print(len(self.cmdList), self.runningCmd)
 		if len(self.cmdList) - 1 < self.runningCmd:
 			self.activityslider.setValue(0)
 			self.slider.setValue(len(self.cmdList))
@@ -113,7 +113,7 @@ class Opkg(Screen):
 			self.session.openWithCallback(
 				self.modificationCallback,
 				MessageBox,
-				_("A configuration file (%s) was modified since Installation.\nDo you want to keep your version?") % (param)
+				_("A configuration file (%s) has been modified since it was installed. Would you like to keep the modified version?") % (param)
 			)
 
 	def modificationCallback(self, res):

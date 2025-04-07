@@ -1,16 +1,16 @@
 from Plugins.Plugin import PluginDescriptor
 from Components.ConfigList import ConfigListScreen
-from Components.config import getConfigListEntry, config, ConfigNothing
+from Components.config import config, ConfigNothing
 from Components.ActionMap import ActionMap
 from Components.Sources.StaticText import StaticText
 from Screens.Screen import Screen
 from Screens.MessageBox import MessageBox
-import VideoEnhancement
+from .import VideoEnhancement
 import os
 import skin
 
 
-class VideoEnhancementSetup(Screen, ConfigListScreen):
+class VideoEnhancementSetup(ConfigListScreen, Screen):
 
 	skin = """
 		<screen name="VideoEnhancementSetup" position="center,center" size="560,440" title="VideoEnhancementSetup">
@@ -29,10 +29,9 @@ class VideoEnhancementSetup(Screen, ConfigListScreen):
 
 	def __init__(self, session):
 		Screen.__init__(self, session)
-		self.session = session
 		self.onChangedEntry = []
 		self.skinName = ["VideoEnhancementSetup"]
-		self.setup_title = _("Video enhancement setup")
+		self.setTitle(_("Video enhancement setup"))
 		self["introduction"] = StaticText()
 
 		self.list = []
@@ -59,10 +58,6 @@ class VideoEnhancementSetup(Screen, ConfigListScreen):
 			self["config"].onSelectionChanged.append(self.SelectionChanged)
 		self.rememberOldSettings()
 		self.changedEntry()
-		self.onLayoutFinish.append(self.layoutFinished)
-
-	def layoutFinished(self):
-		self.setTitle(self.setup_title)
 
 	def rememberOldSettings(self):
 		self.oldContrast = config.pep.contrast.value
@@ -85,7 +80,7 @@ class VideoEnhancementSetup(Screen, ConfigListScreen):
 	def addToConfigList(self, description, configEntry, hinttext, add_to_xtdlist=False):
 		if isinstance(configEntry, ConfigNothing):
 			return None
-		entry = getConfigListEntry(description, configEntry, hinttext)
+		entry = (description, configEntry, hinttext)
 		self.list.append(entry)
 		if add_to_xtdlist:
 			self.xtdlist.append(entry)
@@ -102,7 +97,7 @@ class VideoEnhancementSetup(Screen, ConfigListScreen):
 		self.brightnessEntry = addToConfigList(_("Brightness"), config.pep.brightness, _("This option sets the picture brightness."))
 		self.blue_boostEntry = addToConfigList(_("Boost blue"), config.pep.blue_boost, _("This option allows you to boost the blue tones in the picture."), add_to_xtdlist)
 		self.green_boostEntry = addToConfigList(_("Boost green"), config.pep.green_boost, _("This option allows you to boost the green tones in the picture."), add_to_xtdlist)
-		self.contrastEntry = addToConfigList(_("Contrast"), config.pep.contrast, _("This option sets  the picture contrast."))
+		self.contrastEntry = addToConfigList(_("Contrast"), config.pep.contrast, _("This option sets the picture contrast."))
 		self.digital_contour_removalEntry = addToConfigList(_("Digital contour removal"), config.pep.digital_contour_removal, _("This option sets the surpression of false digital contours, that are the result of a limited number of discrete values."), add_to_xtdlist)
 		self.dynamic_contrastEntry = addToConfigList(_("Dynamic contrast"), config.pep.dynamic_contrast, _("This option allows to set the level of dynamic contrast of the picture."), add_to_xtdlist)
 		self.hueEntry = addToConfigList(_("Hue"), config.pep.hue, _("This option sets the picture hue."))
@@ -166,12 +161,6 @@ class VideoEnhancementSetup(Screen, ConfigListScreen):
 		self.keyYellowConfirm(True)
 		self.close()
 
-	def keyCancel(self):
-		if self["config"].isChanged():
-			self.session.openWithCallback(self.cancelConfirm, MessageBox, _("Really close without saving settings?"), default=False)
-		else:
-			self.close()
-
 	def keyYellowConfirm(self, confirmed):
 		if confirmed:
 			if self.contrastEntry is not None:
@@ -212,7 +201,7 @@ class VideoEnhancementSetup(Screen, ConfigListScreen):
 		self.session.openWithCallback(self.keyYellowConfirm, MessageBox, _("Reset video enhancement settings to your last configuration?"), MessageBox.TYPE_YESNO, timeout=20, default=False)
 
 	def keyBlueConfirm(self, confirmed):
-		if not confirmed:
+		if confirmed:
 			if self.contrastEntry is not None:
 				config.pep.contrast.setValue(128)
 			if self.saturationEntry is not None:
@@ -250,23 +239,8 @@ class VideoEnhancementSetup(Screen, ConfigListScreen):
 	def keyBlue(self):
 		self.session.openWithCallback(self.keyBlueConfirm, MessageBox, _("Reset video enhancement settings to system defaults?"), MessageBox.TYPE_YESNO, timeout=20, default=False)
 
-	# for summary:
-	def changedEntry(self):
-		for x in self.onChangedEntry:
-			x()
 
-	def getCurrentEntry(self):
-		return self["config"].getCurrent()[0]
-
-	def getCurrentValue(self):
-		return str(self["config"].getCurrent()[1].getText())
-
-	def createSummary(self):
-		from Screens.Setup import SetupSummary
-		return SetupSummary
-
-
-class VideoEnhancementPreview(Screen, ConfigListScreen):
+class VideoEnhancementPreview(ConfigListScreen, Screen):
 	skin = """
 		<screen name="VideoEnhancementPreview" position="center,e-170" size="560,170" title="VideoEnhancementPreview">
 			<ePixmap pixmap="buttons/red.png" position="0,0" size="140,40" alphatest="on" />
@@ -282,7 +256,7 @@ class VideoEnhancementPreview(Screen, ConfigListScreen):
 		Screen.__init__(self, session)
 
 		self.onChangedEntry = []
-		self.setup_title = _("Video enhancement preview")
+		self.setTitle(_("Video enhancement preview"))
 		self.oldSplitMode = oldSplitMode
 		self.maxValue = maxValue
 		self.configStepsEntry = None
@@ -304,15 +278,11 @@ class VideoEnhancementPreview(Screen, ConfigListScreen):
 		self["introduction"] = StaticText()
 
 		self.createSetup()
-		self.onLayoutFinish.append(self.layoutFinished)
-
-	def layoutFinished(self):
-		self.setTitle(self.setup_title)
 
 	def createSetup(self):
 		self.list = []
 		if self.maxValue == 255:
-			self.configStepsEntry = getConfigListEntry(_("Change step size"), config.pep.configsteps)
+			self.configStepsEntry = (_("Change step size"), config.pep.configsteps)
 
 		if self.configEntry is not None:
 			self.list = self.configEntry
@@ -335,15 +305,15 @@ class VideoEnhancementPreview(Screen, ConfigListScreen):
 			else:
 				self.isStepSlider = False
 		except AttributeError:
-			print "[VideoEnhancement] no max value"
+			print("[VideoEnhancement] no max value")
 
 	def keyLeft(self):
-		if self.isStepSlider is True:
+		if self.isStepSlider:
 			self["config"].getCurrent()[1].increment = config.pep.configsteps.value
 		ConfigListScreen.keyLeft(self)
 
 	def keyRight(self):
-		if self.isStepSlider is True:
+		if self.isStepSlider:
 			self["config"].getCurrent()[1].increment = config.pep.configsteps.value
 		ConfigListScreen.keyRight(self)
 
@@ -378,10 +348,6 @@ class VideoEnhancementPreview(Screen, ConfigListScreen):
 
 	def getCurrentValue(self):
 		return str(self["config"].getCurrent()[1].getText())
-
-	def createSummary(self):
-		from Screens.Setup import SetupSummary
-		return SetupSummary
 
 
 def videoEnhancementSetupMain(session, **kwargs):

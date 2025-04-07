@@ -3,7 +3,6 @@ from Components.Sensors import sensors
 from Components.Sources.Sensor import SensorSource
 from Components.Sources.StaticText import StaticText
 from Components.ConfigList import ConfigListScreen
-from Components.config import getConfigListEntry
 
 from Screens.Screen import Screen
 
@@ -12,7 +11,7 @@ from Components.FanControl import fancontrol
 import skin
 
 
-class TempFanControl(Screen, ConfigListScreen):
+class TempFanControl(ConfigListScreen, Screen):
 	skin = """
 		<screen position="center,center" size="570,420" title="Temperature and fan control" >
 			<ePixmap pixmap="buttons/red.png" position="0,0" size="140,40" alphatest="on" />
@@ -127,10 +126,10 @@ class TempFanControl(Screen, ConfigListScreen):
 
 		self.list = []
 		for count in range(fancontrol.getFanCount()):
-			self.list.append(getConfigListEntry(_("Fan %d voltage") % (count + 1), fancontrol.getConfig(count).vlt))
-			self.list.append(getConfigListEntry(_("Fan %d PWM") % (count + 1), fancontrol.getConfig(count).pwm))
-			self.list.append(getConfigListEntry(_("Standby fan %d voltage") % (count + 1), fancontrol.getConfig(count).vlt_standby))
-			self.list.append(getConfigListEntry(_("Standby fan %d PWM") % (count + 1), fancontrol.getConfig(count).pwm_standby))
+			self.list.append((_("Fan %d voltage") % (count + 1), fancontrol.getConfig(count).vlt))
+			self.list.append((_("Fan %d PWM") % (count + 1), fancontrol.getConfig(count).pwm))
+			self.list.append((_("Standby fan %d voltage") % (count + 1), fancontrol.getConfig(count).vlt_standby))
+			self.list.append((_("Standby fan %d PWM") % (count + 1), fancontrol.getConfig(count).pwm_standby))
 
 		ConfigListScreen.__init__(self, self.list, session=self.session)
 		#self["config"].list = self.list

@@ -16,7 +16,7 @@ from datetime import date
 
 config.plugins.configurationbackup = ConfigSubsection()
 config.plugins.configurationbackup.backuplocation = ConfigText(default='/media/hdd/', visible_width=50, fixed_size=False)
-config.plugins.configurationbackup.backupdirs = ConfigLocations(default=[eEnv.resolve('${sysconfdir}/enigma2/'), '/etc/network/interfaces', '/etc/wpa_supplicant.conf', '/etc/wpa_supplicant.ath0.conf', '/etc/wpa_supplicant.wlan0.conf', '/etc/resolv.conf', '/etc/default_gw', '/etc/hostname'])
+config.plugins.configurationbackup.backupdirs = ConfigLocations(default=[eEnv.resolve('${sysconfdir}/enigma2/'), '/etc/network/interfaces', '/etc/wpa_supplicant.conf', '/etc/wpa_supplicant.ath0.conf', '/etc/wpa_supplicant.wlan0.conf', '/etc/default_gw', '/etc/hostname'])
 
 
 def getBackupPath():
@@ -31,7 +31,7 @@ def getBackupFilename():
 	return "enigma2settingsbackup.tar.gz"
 
 
-class BackupScreen(Screen, ConfigListScreen):
+class BackupScreen(ConfigListScreen, Screen):
 	skin = """
 		<screen position="135,144" size="350,310" title="Backup is running" >
 		<widget name="config" position="10,10" size="330,250" transparent="1" scrollbarMode="showOnDemand" />
@@ -39,7 +39,7 @@ class BackupScreen(Screen, ConfigListScreen):
 
 	def __init__(self, session, runBackup=False):
 		Screen.__init__(self, session)
-		self.session = session
+		self.setTitle(_("Backup is running..."))
 		self.runBackup = runBackup
 		self["actions"] = ActionMap(["WizardActions", "DirectionActions"],
 		{
@@ -53,15 +53,8 @@ class BackupScreen(Screen, ConfigListScreen):
 		self.fullbackupfilename = self.backuppath + "/" + self.backupfile
 		self.list = []
 		ConfigListScreen.__init__(self, self.list)
-		self.onLayoutFinish.append(self.layoutFinished)
 		if self.runBackup:
 			self.onShown.append(self.doBackup)
-
-	def layoutFinished(self):
-		self.setWindowTitle()
-
-	def setWindowTitle(self):
-		self.setTitle(_("Backup is running..."))
 
 	def doBackup(self):
 		configfile.save()
@@ -112,6 +105,7 @@ class BackupSelection(Screen):
 
 	def __init__(self, session):
 		Screen.__init__(self, session)
+		self.setTitle(_("Select files/folders to backup"))
 		self["key_red"] = StaticText(_("Cancel"))
 		self["key_green"] = StaticText(_("Save"))
 		self["key_yellow"] = StaticText()
@@ -141,19 +135,13 @@ class BackupSelection(Screen):
 	def layoutFinished(self):
 		idx = 0
 		self["checkList"].moveToIndex(idx)
-		self.setWindowTitle()
 		self.selectionChanged()
-
-	def setWindowTitle(self):
-		self.setTitle(_("Select files/folders to backup"))
 
 	def selectionChanged(self):
 		current = self["checkList"].getCurrent()[0]
 		if len(current) > 2:
-			if current[2] is True:
-				self["key_yellow"].setText(_("Deselect"))
-			else:
-				self["key_yellow"].setText(_("Select"))
+			text = _("Deselect") if current[2] else _("Select")
+			self["key_yellow"].setText(text)
 
 	def up(self):
 		self["checkList"].up()
@@ -201,6 +189,7 @@ class RestoreMenu(Screen):
 
 	def __init__(self, session, plugin_path):
 		Screen.__init__(self, session)
+		self.setTitle(_("Restore backups"))
 		self.skin_path = plugin_path
 
 		self["key_red"] = StaticText(_("Cancel"))
@@ -229,13 +218,6 @@ class RestoreMenu(Screen):
 		self.flist = []
 		self["filelist"] = MenuList(self.flist)
 		self.fill_list()
-		self.onLayoutFinish.append(self.layoutFinished)
-
-	def layoutFinished(self):
-		self.setWindowTitle()
-
-	def setWindowTitle(self):
-		self.setTitle(_("Restore backups"))
 
 	def fill_list(self):
 		self.flist = []
@@ -250,7 +232,7 @@ class RestoreMenu(Screen):
 		self["filelist"].l.setList(self.flist)
 
 	def KeyOk(self):
-		if (self.exe == False) and (self.entry == True):
+		if not self.exe and self.entry:
 			self.sel = self["filelist"].getCurrent()
 			if self.sel:
 				self.val = self.path + "/" + self.sel
@@ -260,28 +242,28 @@ class RestoreMenu(Screen):
 		self.close()
 
 	def startRestore(self, ret=False):
-		if (ret == True):
+		if ret:
 			self.exe = True
 			self.session.open(Console, title=_("Restoring..."), cmdlist=["tar -xzvf " + self.path + "/" + self.sel + " -C /", "killall -9 enigma2"])
 
 	def deleteFile(self):
-		if (self.exe == False) and (self.entry == True):
+		if not self.exe and self.entry:
 			self.sel = self["filelist"].getCurrent()
 			if self.sel:
 				self.val = self.path + "/" + self.sel
 				self.session.openWithCallback(self.startDelete, MessageBox, _("Are you sure you want to delete\nthe following backup:\n") + self.sel)
 
 	def startDelete(self, ret=False):
-		if (ret == True):
+		if ret:
 			self.exe = True
-			print "removing:", self.val
-			if (path.exists(self.val) == True):
+			print("removing:", self.val)
+			if path.exists(self.val):
 				remove(self.val)
 			self.exe = False
 			self.fill_list()
 
 
-class RestoreScreen(Screen, ConfigListScreen):
+class RestoreScreen(ConfigListScreen, Screen):
 	skin = """
 		<screen position="135,144" size="350,310" title="Restore is running..." >
 		<widget name="config" position="10,10" size="330,250" transparent="1" scrollbarMode="showOnDemand" />
@@ -289,7 +271,7 @@ class RestoreScreen(Screen, ConfigListScreen):
 
 	def __init__(self, session, runRestore=False):
 		Screen.__init__(self, session)
-		self.session = session
+		self.setTitle(_("Restoring..."))
 		self.runRestore = runRestore
 		self["actions"] = ActionMap(["WizardActions", "DirectionActions"],
 		{
@@ -303,15 +285,8 @@ class RestoreScreen(Screen, ConfigListScreen):
 		self.fullbackupfilename = self.backuppath + "/" + self.backupfile
 		self.list = []
 		ConfigListScreen.__init__(self, self.list)
-		self.onLayoutFinish.append(self.layoutFinished)
 		if self.runRestore:
 			self.onShown.append(self.doRestore)
-
-	def layoutFinished(self):
-		self.setWindowTitle()
-
-	def setWindowTitle(self):
-		self.setTitle(_("Restoring..."))
 
 	def doRestore(self):
 		if path.exists("/proc/stb/vmpeg/0/dst_width"):

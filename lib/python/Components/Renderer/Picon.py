@@ -1,10 +1,9 @@
 import os
 import re
-import unicodedata
-from Renderer import Renderer
-from enigma import ePixmap, eServiceCenter, eServiceReference, iServiceInformation
+from Components.Renderer.Renderer import Renderer
+from enigma import ePixmap, ePicLoad, eServiceCenter, eServiceReference, iServiceInformation
 from Tools.Alternatives import GetWithAlternative
-from Tools.Directories import pathExists, SCOPE_SKIN_IMAGE, SCOPE_CURRENT_SKIN, resolveFilename
+from Tools.Directories import pathExists, SCOPE_SKIN_IMAGE, SCOPE_CURRENT_SKIN, resolveFilename, sanitizeFilename
 from Components.Harddisk import harddiskmanager
 from ServiceReference import ServiceReference
 from Components.config import config
@@ -29,11 +28,11 @@ def onMountpointAdded(mountpoint):
 		if os.path.isdir(path) and path not in searchPaths:
 			for fn in os.listdir(path):
 				if fn.endswith('.png') or fn.endswith('.svg'):
-					print "[Picon] adding path:", path
+					print("[Picon] adding path:", path)
 					searchPaths.append(path)
 					break
-	except Exception, ex:
-		print "[Picon] Failed to investigate %s:" % mountpoint, ex
+	except Exception as ex:
+		print("[Picon] Failed to investigate %s:" % mountpoint, ex)
 
 
 def onMountpointRemoved(mountpoint):
@@ -41,7 +40,7 @@ def onMountpointRemoved(mountpoint):
 	path = os.path.join(mountpoint, 'picon') + '/'
 	try:
 		searchPaths.remove(path)
-		print "[Picon] removed path:", path
+		print("[Picon] removed path:", path)
 	except:
 		pass
 
@@ -95,15 +94,11 @@ def getPiconName(serviceRef):
 		fields[2] = '1'
 		pngname = findPicon('_'.join(fields))
 	if not pngname: # picon by channel name
-		name = ServiceReference(serviceRef).getServiceName()
-		name = unicodedata.normalize('NFKD', unicode(name, 'utf_8', errors='ignore')).encode('ASCII', 'ignore')
-		name = re.sub('[^a-z0-9]', '', name.replace('&', 'and').replace('+', 'plus').replace('*', 'star').lower())
-		if name:
-			pngname = findPicon(name)
-			if not pngname and len(name) > 2 and name.endswith('hd'):
-				pngname = findPicon(name[:-2])
-			if not pngname and len(name) > 6:
-				series = re.sub(r's[0-9]*e[0-9]*$', '', name)
+		if (sname := ServiceReference(serviceRef).getServiceName()) and "SID 0x" not in sname and (utf8_name := sanitizeFilename(sname).lower()) and utf8_name != "__":  # avoid lookups on zero length service names
+			legacy_name = re.sub("[^a-z0-9]", "", utf8_name.replace("&", "and").replace("+", "plus").replace("*", "star"))  # legacy ascii service name picons
+			pngname = findPicon(utf8_name) or legacy_name and findPicon(legacy_name) or findPicon(re.sub(r"(fhd|uhd|hd|sd|4k)$", "", utf8_name).strip()) or legacy_name and findPicon(re.sub(r"(fhd|uhd|hd|sd|4k)$", "", legacy_name).strip())
+			if not pngname and len(legacy_name) > 6:
+				series = re.sub(r"s[0-9]*e[0-9]*$", "", legacy_name)
 				pngname = findPicon(series)
 	return pngname
 
@@ -111,7 +106,12 @@ def getPiconName(serviceRef):
 class Picon(Renderer):
 	def __init__(self):
 		Renderer.__init__(self)
+		self.usePicLoad = False
+		self.PicLoad = ePicLoad()
+		self.PicLoad.PictureData.get().append(self.updatePicon)
+		self.piconsize = (0, 0)
 		self.pngname = ""
+		self.service_text = ""
 		self.lastPath = None
 		pngname = findPicon("picon_default")
 		self.defaultpngname = None
@@ -142,25 +142,48 @@ class Picon(Renderer):
 			elif attrib == "isFrontDisplayPicon":
 				self.showPicon = value == "0"
 				attribs.remove((attrib, value))
+			elif attrib == "usePicLoad":
+				self.usePicLoad = value == "1"
+				attribs.remove((attrib, value))
+			elif attrib == "size":
+				self.piconsize = value
 		self.skinAttributes = attribs
-		self.changed((self.CHANGED_ALL,))
 		return Renderer.applySkin(self, desktop, parent)
 
 	GUI_WIDGET = ePixmap
+
+	def updatePicon(self, picInfo=None):
+		ptr = self.PicLoad.getData()
+		if ptr is not None and self.instance:
+			self.instance.setPixmap(ptr.__deref__())
+			self.instance.show()
 
 	def changed(self, what):
 		if self.instance:
 			if self.showPicon or config.usage.show_picon_in_display.value:
 				pngname = ""
-				if what[0] != self.CHANGED_CLEAR:
+				if what[0] in (self.CHANGED_ALL, self.CHANGED_SPECIFIC):
+					if self.usePicLoad and self.source.text and self.service_text and self.source.text == self.service_text:
+						return
+					self.service_text = self.source.text
 					pngname = getPiconName(self.source.text)
+				else:
+					if what[0] == self.CHANGED_CLEAR:
+						self.service_text = self.pngname = ""
+						if self.visible:
+							self.instance.hide()
+					return
 				if not pngname: # no picon for service found
 					pngname = self.defaultpngname
 				if self.pngname != pngname:
 					if pngname:
-						self.instance.setScale(1)
-						self.instance.setPixmapFromFile(pngname)
-						self.instance.show()
+						if self.usePicLoad:
+							self.PicLoad.setPara((self.piconsize[0], self.piconsize[1], 0, 0, 1, 1, "#FF000000"))
+							self.PicLoad.startDecode(pngname)
+						else:
+							self.instance.setScale(1)
+							self.instance.setPixmapFromFile(pngname)
+							self.instance.show()
 					else:
 						self.instance.hide()
 					self.pngname = pngname

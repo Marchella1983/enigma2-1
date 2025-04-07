@@ -113,7 +113,7 @@ class TimerEntry:
 		return self.end <= time() and self.state == TimerEntry.StateWaiting
 
 	def abort(self):
-		self.end = time()
+		self.end = int(time())
 
 		# in case timer has not yet started, but gets aborted (so it's preparing),
 		# set begin to now.
@@ -217,7 +217,7 @@ class Timer:
 	def calcNextActivation(self):
 		now = time()
 		if self.lastActivation > now:
-			print "[timer.py] timewarp - re-evaluating all processed timers."
+			print("[timer.py] timewarp - re-evaluating all processed timers.")
 			tl = self.processed_timers
 			self.processed_timers = []
 			for x in tl:
@@ -246,7 +246,7 @@ class Timer:
 		self.setNextActivation(now, min)
 
 	def timeChanged(self, timer):
-		print "time changed"
+		print("time changed")
 		timer.timeChanged()
 		if timer.state == TimerEntry.StateEnded:
 			if timer in self.processed_timers:
@@ -255,7 +255,7 @@ class Timer:
 			try:
 				self.timer_list.remove(timer)
 			except:
-				print "[timer] Failed to remove, not in list"
+				print("[timer] Failed to remove, not in list")
 				return
 		# give the timer a chance to re-enqueue
 		if timer.state == TimerEntry.StateEnded:

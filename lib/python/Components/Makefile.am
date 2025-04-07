@@ -1,6 +1,6 @@
 installdir = $(pkglibdir)/python/Components
 
-SUBDIRS = Sources Converter Renderer
+SUBDIRS = Sources Converter Renderer Addons
 
 install_PYTHON = \
 	ActionMap.py PerServiceDisplay.py \
@@ -21,4 +21,4 @@ install_PYTHON = \
 	Task.py Console.py ResourceManager.py TuneTest.py \
 	Keyboard.py Sensors.py FanControl.py HdmiCec.py RcModel.py \
 	Netlink.py InputHotplug.py \
-	ImportChannels.py
+	ImportChannels.py  PowerOffTimer.py

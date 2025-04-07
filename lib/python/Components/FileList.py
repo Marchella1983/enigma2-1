@@ -1,6 +1,6 @@
 import os
 import re
-from MenuList import MenuList
+from Components.MenuList import MenuList
 from Components.Harddisk import harddiskmanager
 from Tools.Directories import SCOPE_CURRENT_SKIN, resolveFilename, fileExists
 from enigma import RT_HALIGN_LEFT, eListboxPythonMultiContent, eServiceReference, eServiceCenter, gFont
@@ -66,7 +66,7 @@ EXTENSIONS = {
 
 def FileEntryComponent(name, absolute=None, isDir=False):
 	res = [(absolute, isDir)]
-	x, y, w, h = parameters.get("FileListName", applySkinFactor(35, 1, 600, 20))
+	x, y, w, h = parameters.get("FileListName", applySkinFactor(35, 1, 600, 22))
 	res.append((eListboxPythonMultiContent.TYPE_TEXT, x, y, w, h, 0, RT_HALIGN_LEFT, name))
 	if isDir:
 		png = LoadPixmap(cached=True, path=resolveFilename(SCOPE_CURRENT_SKIN, "extensions/directory.png"))
@@ -146,7 +146,7 @@ class FileList(MenuList):
 
 	def getCurrentEvent(self):
 		l = self.l.getCurrentSelection()
-		if not l or l[0][1] == True:
+		if not l or l[0][1]:
 			return None
 		else:
 			return self.serviceHandler.info(l[0][0]).getEvent(l[0][0])
@@ -192,7 +192,7 @@ class FileList(MenuList):
 			serviceHandler = eServiceCenter.getInstance()
 			list = serviceHandler.list(root)
 
-			while 1:
+			while True:
 				s = list.getNext()
 				if not s.valid():
 					del list
@@ -345,30 +345,31 @@ class MultiFileSelectList(FileList):
 			f()
 
 	def changeSelectionState(self):
-		idx = self.l.getCurrentSelectionIndex()
-		newList = self.list[:]
-		x = self.list[idx]
-		if not x[0][3].startswith('<'):
-			if x[0][1] is True:
-				realPathname = x[0][0]
-			else:
-				realPathname = self.current_directory + x[0][0]
-			if x[0][2]:
-				SelectState = False
-				try:
-					self.selectedFiles.remove(realPathname)
-				except:
+		if len(self.list):
+			idx = self.l.getCurrentSelectionIndex()
+			newList = self.list[:]
+			x = self.list[idx]
+			if x and len(x[0]) > 2 and not x[0][3].startswith('<'):
+				if x[0][1]:
+					realPathname = x[0][0]
+				else:
+					realPathname = self.current_directory + x[0][0]
+				if x[0][2]:
+					SelectState = False
 					try:
-						self.selectedFiles.remove(os.path.normpath(realPathname))
+						self.selectedFiles.remove(realPathname)
 					except:
-						print "Couldn't remove:", realPathname
-			else:
-				SelectState = True
-				if (realPathname not in self.selectedFiles) and (os.path.normpath(realPathname) not in self.selectedFiles):
-					self.selectedFiles.append(realPathname)
-			newList[idx] = MultiFileSelectEntryComponent(name=x[0][3], absolute=x[0][0], isDir=x[0][1], selected=SelectState)
-		self.list = newList
-		self.l.setList(self.list)
+						try:
+							self.selectedFiles.remove(os.path.normpath(realPathname))
+						except (IOError, OSError) as err:
+							print("[FileList] Error %d: Can't remove '%s'!  (%s)" % (err.errno, realPathname, err.strerror))
+				else:
+					SelectState = True
+					if (realPathname not in self.selectedFiles) and (os.path.normpath(realPathname) not in self.selectedFiles):
+						self.selectedFiles.append(realPathname)
+				newList[idx] = MultiFileSelectEntryComponent(name=x[0][3], absolute=x[0][0], isDir=x[0][1], selected=SelectState)
+			self.list = newList
+			self.l.setList(self.list)
 
 	def getSelectedList(self):
 		return self.selectedFiles
@@ -403,7 +404,7 @@ class MultiFileSelectList(FileList):
 			serviceHandler = eServiceCenter.getInstance()
 			list = serviceHandler.list(root)
 
-			while 1:
+			while True:
 				s = list.getNext()
 				if not s.valid():
 					del list
@@ -450,7 +451,9 @@ class MultiFileSelectList(FileList):
 				if (self.matchingPattern is None) or self.matchingPattern.search(path):
 					alreadySelected = False
 					for entry in self.selectedFiles:
-						if os.path.basename(entry) == x:
+						if self.useServiceRef and os.path.basename(entry) == x:
+							alreadySelected = True
+						elif entry == path:
 							alreadySelected = True
 					self.list.append(MultiFileSelectEntryComponent(name=name, absolute=x, isDir=False, selected=alreadySelected))
 

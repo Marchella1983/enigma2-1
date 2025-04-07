@@ -25,7 +25,7 @@ DEFINE_REF(ePicLoad);
 
 static std::string getSize(const char* file)
 {
-	struct stat64 s;
+	struct stat64 s = {};
 	if (stat64(file, &s) < 0)
 		return "";
 	return std::to_string((long)(s.st_size / 1024)) + " kB";
@@ -68,6 +68,8 @@ static unsigned char *color_resize(unsigned char * orgin, int ox, int oy, int dx
 					b += q[2];
 				}
 			}
+			if (sq == 0) // prevent division by zero
+				sq = 1;
 			p[0] = r / sq;
 			p[1] = g / sq;
 			p[2] = b / sq;
@@ -111,12 +113,16 @@ static void fetch_pallete(int fd, struct color pallete[], int count)
 
 static unsigned char *bmp_load(const char *file,  int *x, int *y)
 {
-	unsigned char buff[4];
-	struct color pallete[256];
+	unsigned char buff[4] = {};
+	struct color pallete[256] = {};
 
 	int fd = open(file, O_RDONLY);
 	if (fd == -1) return NULL;
-	if (lseek(fd, BMP_SIZE_OFFSET, SEEK_SET) == -1) return NULL;
+	if (lseek(fd, BMP_SIZE_OFFSET, SEEK_SET) == -1)
+	{
+		close(fd);
+		return NULL;
+	}
 	if (read(fd, buff, 4) != 4) // failed to read x
 	{
 		close(fd);
@@ -164,7 +170,10 @@ static unsigned char *bmp_load(const char *file,  int *x, int *y)
 			lseek(fd, raster, SEEK_SET);
 			unsigned char * tbuffer = new unsigned char[*x / 2 + 1];
 			if (tbuffer == NULL)
+			{
+				close(fd);
 				return NULL;
+			}
 			for (int i = 0; i < *y; i++)
 			{
 				if (read(fd, tbuffer, (*x) / 2 + *x % 2) != ((*x) / 2 + *x % 2))
@@ -209,7 +218,10 @@ static unsigned char *bmp_load(const char *file,  int *x, int *y)
 			lseek(fd, raster, SEEK_SET);
 			unsigned char * tbuffer = new unsigned char[*x];
 			if (tbuffer == NULL)
+			{
+				close(fd);
 				return NULL;
+			}
 			for (int i = 0; i < *y; i++)
 			{
 				if (read(fd, tbuffer, *x) != *x)
@@ -262,6 +274,7 @@ static unsigned char *bmp_load(const char *file,  int *x, int *y)
 			break;
 		}
 		default:
+			delete [] pic_buffer;
 			close(fd);
 			return NULL;
 	}
@@ -412,9 +425,9 @@ void jpeg_cb_error_exit(j_common_ptr cinfo)
 
 static unsigned char *jpeg_load(const char *file, int *ox, int *oy, unsigned int max_x, unsigned int max_y)
 {
-	struct jpeg_decompress_struct cinfo;
+	struct jpeg_decompress_struct cinfo = {};
 	struct jpeg_decompress_struct *ciptr = &cinfo;
-	struct r_jpeg_error_mgr emgr;
+	struct r_jpeg_error_mgr emgr = {};
 	unsigned char *pic_buffer;
 	CFile fh(file, "rb");
 
@@ -472,8 +485,8 @@ static unsigned char *jpeg_load(const char *file, int *ox, int *oy, unsigned int
 
 static int jpeg_save(const char * filename, int ox, int oy, unsigned char *pic_buffer)
 {
-	struct jpeg_compress_struct cinfo;
-	struct jpeg_error_mgr jerr;
+	struct jpeg_compress_struct cinfo = {};
+	struct jpeg_error_mgr jerr = {};
 	JSAMPROW row_pointer[1];
 	int row_stride;
 	CFile outfile(filename, "wb");
@@ -578,6 +591,7 @@ static void svg_load(Cfilepara* filepara, bool forceRGB = false)
 		unsigned char *pic_buffer2 = (unsigned char*)malloc(w*h*3); // 24bit RGB
 		if (pic_buffer2 == nullptr)
 		{
+			free(pic_buffer);
 			return;
 		}
 		for (int i=0; i<w*h; i++)
@@ -1022,43 +1036,43 @@ PyObject *ePicLoad::getInfo(const char *filename)
 		char tmp[256];
 		int pos = 0;
 		list = PyList_New(23);
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(filename));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->Version));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->CameraMake));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->CameraModel));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->DateTime));
-		PyList_SET_ITEM(list, pos++,  PyString_FromFormat("%d x %d", m_exif->m_exifinfo->Width, m_exif->m_exifinfo->Height));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->FlashUsed));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->Orientation));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->Comments));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->MeteringMode));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->ExposureProgram));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->LightSource));
-		PyList_SET_ITEM(list, pos++,  PyString_FromFormat("%d", m_exif->m_exifinfo->CompressionLevel));
-		PyList_SET_ITEM(list, pos++,  PyString_FromFormat("%d", m_exif->m_exifinfo->ISOequivalent));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(filename));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->Version));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->CameraMake));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->CameraModel));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->DateTime));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromFormat("%d x %d", m_exif->m_exifinfo->Width, m_exif->m_exifinfo->Height));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->FlashUsed));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->Orientation));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->Comments));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->MeteringMode));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->ExposureProgram));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->LightSource));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromFormat("%d", m_exif->m_exifinfo->CompressionLevel));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromFormat("%d", m_exif->m_exifinfo->ISOequivalent));
 		snprintf(tmp, sizeof(tmp) - 1, "%.2f", m_exif->m_exifinfo->Xresolution);
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(tmp));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(tmp));
 		snprintf(tmp, sizeof(tmp) - 1, "%.2f", m_exif->m_exifinfo->Yresolution);
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(tmp));
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(m_exif->m_exifinfo->ResolutionUnit));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(tmp));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(m_exif->m_exifinfo->ResolutionUnit));
 		snprintf(tmp, sizeof(tmp) - 1, "%.2f", m_exif->m_exifinfo->Brightness);
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(tmp));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(tmp));
 		snprintf(tmp, sizeof(tmp) - 1, "%.5f sec.", m_exif->m_exifinfo->ExposureTime);
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(tmp));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(tmp));
 		snprintf(tmp, sizeof(tmp) - 1, "%.5f", m_exif->m_exifinfo->ExposureBias);
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(tmp));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(tmp));
 		snprintf(tmp, sizeof(tmp) - 1, "%.5f", m_exif->m_exifinfo->Distance);
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(tmp));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(tmp));
 		snprintf(tmp, sizeof(tmp) - 1, "%.5f", m_exif->m_exifinfo->CCDWidth);
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(tmp));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(tmp));
 		snprintf(tmp, sizeof(tmp) - 1, "%.2f", m_exif->m_exifinfo->ApertureFNumber);
-		PyList_SET_ITEM(list, pos++,  PyString_FromString(tmp));
+		PyList_SET_ITEM(list, pos++,  PyUnicode_FromString(tmp));
 	}
 	else
 	{
 		list = PyList_New(2);
-		PyList_SET_ITEM(list, 0, PyString_FromString(filename));
-		PyList_SET_ITEM(list, 1, PyString_FromString(m_exif->m_szLastError));
+		PyList_SET_ITEM(list, 0, PyUnicode_FromString(filename));
+		PyList_SET_ITEM(list, 1, PyUnicode_FromString(m_exif->m_szLastError));
 	}
 
 	return list ? (PyObject*)list : (PyObject*)PyList_New(0);
@@ -1077,16 +1091,17 @@ bool ePicLoad::getExif(const char *filename, int fileType, int Thumb)
 
 int ePicLoad::getData(ePtr<gPixmap> &result)
 {
-	result = 0;
 	if (m_filepara == NULL)
 	{
 		eDebug("[ePicLoad] Weird situation, was not decoding anything!");
+		result = 0;
 		return 1;
 	}
 	if(m_filepara->pic_buffer == NULL)
 	{
 		delete m_filepara;
 		m_filepara = NULL;
+		result = 0;
 		if (m_exif != NULL) {
 			m_exif->ClearExif();
 			delete m_exif;
@@ -1375,21 +1390,17 @@ RESULT ePicLoad::setPara(PyObject *val)
 	if (PySequence_Size(val) < 7)
 		return 0;
 	else {
-		ePyObject fast		= PySequence_Fast(val, "");
-		int width		= PyInt_AsLong(PySequence_Fast_GET_ITEM(fast, 0));
-		int height		= PyInt_AsLong(PySequence_Fast_GET_ITEM(fast, 1));
-		double aspectRatio 	= PyInt_AsLong(PySequence_Fast_GET_ITEM(fast, 2));
-		int as			= PyInt_AsLong(PySequence_Fast_GET_ITEM(fast, 3));
-		bool useCache		= PyInt_AsLong(PySequence_Fast_GET_ITEM(fast, 4));
-		int resizeType	        = PyInt_AsLong(PySequence_Fast_GET_ITEM(fast, 5));
-		const char *bg_str	= PyString_AsString(PySequence_Fast_GET_ITEM(fast, 6));
-		bool auto_orientation	= (PySequence_Size(val) > 7) ?
-						PyInt_AsLong(PySequence_Fast_GET_ITEM(fast, 7)) :
-						0;
-
+		ePyObject fast = PySequence_Fast(val, "");
+		int width = PyLong_AsLong(PySequence_Fast_GET_ITEM(fast, 0));
+		int height = PyLong_AsLong(PySequence_Fast_GET_ITEM(fast, 1));
+		double aspectRatio = PyLong_AsLong(PySequence_Fast_GET_ITEM(fast, 2));
+		int as = PyLong_AsLong(PySequence_Fast_GET_ITEM(fast, 3));
+		bool useCache = PyLong_AsLong(PySequence_Fast_GET_ITEM(fast, 4));
+		int resizeType = PyLong_AsLong(PySequence_Fast_GET_ITEM(fast, 5));
+		const char *bg_str = PyUnicode_AsUTF8(PySequence_Fast_GET_ITEM(fast, 6));
+		bool auto_orientation = (PySequence_Size(val) > 7) ? PyLong_AsLong(PySequence_Fast_GET_ITEM(fast, 7)) : 0;
 		return setPara(width, height, aspectRatio, as, useCache, resizeType, bg_str, auto_orientation);
 	}
-	return 1;
 }
 
 RESULT ePicLoad::setPara(int width, int height, double aspectRatio, int as, bool useCache, int resizeType, const char *bg_str, bool auto_orientation)
@@ -1439,9 +1450,7 @@ int ePicLoad::getFileType(const char * file)
 SWIG_VOID(int) loadPic(ePtr<gPixmap> &result, std::string filename, int x, int y, int aspect, int resize_mode, int rotate, int background, std::string cachefile)
 {
 	long asp1, asp2;
-	result = 0;
 	eDebug("[loadPic] deprecated loadPic function used!!! please use the non blocking version! you can see demo code in Pictureplayer plugin... this function is removed in the near future!");
-	ePicLoad mPL;
 
 	switch(aspect)
 	{
@@ -1459,14 +1468,17 @@ SWIG_VOID(int) loadPic(ePtr<gPixmap> &result, std::string filename, int x, int y
 	PyTuple_SET_ITEM(tuple, 4,  PyLong_FromLong(0));
 	PyTuple_SET_ITEM(tuple, 5,  PyLong_FromLong(resize_mode));
 	if(background)
-		PyTuple_SET_ITEM(tuple, 6,  PyString_FromString("#ff000000"));
+		PyTuple_SET_ITEM(tuple, 6,  PyUnicode_FromString("#ff000000"));
 	else
-		PyTuple_SET_ITEM(tuple, 6,  PyString_FromString("#00000000"));
+		PyTuple_SET_ITEM(tuple, 6,  PyUnicode_FromString("#00000000"));
 
+	ePicLoad mPL;
 	mPL.setPara(tuple);
 
 	if(!mPL.startDecode(filename.c_str(), 0, 0, false))
 		mPL.getData(result);
+	else
+		result = 0;
 
 	return 0;
 }

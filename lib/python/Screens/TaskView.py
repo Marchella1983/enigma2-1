@@ -1,18 +1,18 @@
 from Components.ActionMap import ActionMap
-from Components.config import config, ConfigSubsection, ConfigSelection, getConfigListEntry
+from Components.config import config, ConfigSubsection, ConfigSelection
 from Components.ConfigList import ConfigListScreen
 from Components.Sources.Progress import Progress
 from Components.Sources.StaticText import StaticText
-from Components.SystemInfo import SystemInfo
+from Components.SystemInfo import BoxInfo
 from Components.Task import job_manager
-from InfoBarGenerics import InfoBarNotifications
-from Tools import Notifications
-from Screen import Screen
+from Screens.InfoBarGenerics import InfoBarNotifications
+from Tools.Notifications import AddNotification, AddNotificationWithCallback, notifications
+from Screens.Screen import Screen
 from Screens.MessageBox import MessageBox
 import Screens.Standby
 
 
-class JobView(InfoBarNotifications, Screen, ConfigListScreen):
+class JobView(InfoBarNotifications, ConfigListScreen, Screen):
 	def __init__(self, session, job, parent=None, cancelable=True, backgroundable=True, afterEventChangeable=True):
 		Screen.__init__(self, session, parent)
 		InfoBarNotifications.__init__(self)
@@ -57,7 +57,7 @@ class JobView(InfoBarNotifications, Screen, ConfigListScreen):
 		}, -2)
 
 		self.settings = ConfigSubsection()
-		if SystemInfo["DeepstandbySupport"]:
+		if BoxInfo.getItem("DeepstandbySupport"):
 			shutdownString = _("go to deep standby")
 		else:
 			shutdownString = _("shut down")
@@ -69,7 +69,7 @@ class JobView(InfoBarNotifications, Screen, ConfigListScreen):
 
 	def setupList(self):
 		if self.afterEventChangeable:
-			self["config"].setList([getConfigListEntry(_("After event"), self.settings.afterEvent)])
+			self["config"].setList([(_("After event"), self.settings.afterEvent)])
 		else:
 			self["config"].hide()
 		self.job.afterEvent = self.settings.afterEvent.getValue()
@@ -144,21 +144,23 @@ class JobView(InfoBarNotifications, Screen, ConfigListScreen):
 			self.close(False)
 		if self.settings.afterEvent.getValue() == "deepstandby":
 			if not Screens.Standby.inTryQuitMainloop:
-				Notifications.AddNotificationWithCallback(self.sendTryQuitMainloopNotification, MessageBox, _("A sleep timer wants to shut down\nyour receiver. Shutdown now?"), timeout=20)
+				msg = _("A sleep timer is about to shut down your receiver. Would you like to proceed?")
+				AddNotificationWithCallback(self.sendTryQuitMainloopNotification, MessageBox, msg, timeout=20)
 		elif self.settings.afterEvent.getValue() == "standby":
 			if not Screens.Standby.inStandby:
-				Notifications.AddNotificationWithCallback(self.sendStandbyNotification, MessageBox, _("A sleep timer wants to set your\nreceiver to standby. Do that now?"), timeout=20)
+				msg = _("A sleep timer is about to put your receiver in standby mode. Would you like to proceed?")
+				AddNotificationWithCallback(self.sendStandbyNotification, MessageBox, msg, timeout=20)
 
 	def checkNotifications(self):
 		InfoBarNotifications.checkNotifications(self)
-		if not Notifications.notifications:
+		if not notifications:
 			if self.settings.afterEvent.getValue() == "close" and self.job.status == self.job.FAILED:
 				self.close(False)
 
 	def sendStandbyNotification(self, answer):
 		if answer:
-			Notifications.AddNotification(Screens.Standby.Standby)
+			AddNotification(Screens.Standby.Standby)
 
 	def sendTryQuitMainloopNotification(self, answer):
 		if answer:
-			Notifications.AddNotification(Screens.Standby.TryQuitMainloop, 1)
+			AddNotification(Screens.Standby.TryQuitMainloop, 1)

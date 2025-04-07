@@ -11,6 +11,7 @@
 #include "freesatv2.h"
 #include "big5.h"
 #include "gb18030.h"
+#include <Python.h>
 
 std::string buildShortName( const std::string &str )
 {
@@ -779,16 +780,19 @@ std::string convertDVBUTF8(const unsigned char *data, int len, int table, int ts
 	if (pconvertedLen)
 		*pconvertedLen = convertedLen;
 
-	if (convertedLen < len)
-		eTrace("[convertDVBUTF8] %d chars converted, and %d chars left..", convertedLen, len-convertedLen);
-	eTrace("[convertDVBUTF8] table=0x%02X twochar=%d output:%s\n", table, useTwoCharMapping, output.c_str());
+	//if (convertedLen < len)
+	//	eTrace("[convertDVBUTF8] %d chars converted, and %d chars left..", convertedLen, len-convertedLen);
+	//eTrace("[convertDVBUTF8] table=0x%02X twochar=%d output:%s\n", table, useTwoCharMapping, output.c_str());
 
-	eTrace("[convertDVBUTF8] table=0x%02X tsid:onid=0x%X:0x%X data[0..14]=%s   output:%s\n",
-		table, (unsigned int)tsidonid >> 16, tsidonid & 0xFFFFU,
-		string_to_hex(std::string((char*)data, len < 15 ? len : 15)).c_str(),
-		output.c_str());
+	//eTrace("[convertDVBUTF8] table=0x%02X tsid:onid=0x%X:0x%X data[0..14]=%s   output:%s\n",
+	//	table, (unsigned int)tsidonid >> 16, tsidonid & 0xFFFFU,
+	//	string_to_hex(std::string((char*)data, len < 15 ? len : 15)).c_str(),
+	//	output.c_str());
 	// replace EIT CR/LF with standard newline:
 	output = replace_all(replace_all(output, "\xC2\x8A", "\n"), "\xEE\x82\x8A", "\n");
+	// remove character emphasis control characters:
+	output = replace_all(replace_all(replace_all(replace_all(output, "\xC2\x86", ""), "\xEE\x82\x86", ""), "\xC2\x87", ""), "\xEE\x82\x87", "");
+
 	return output;
 }
 
@@ -905,6 +909,16 @@ int isUTF8(const std::string &string)
 		}
 	}
 	return 1; // can be UTF8 (or pure ASCII, at least no non-UTF-8 8bit characters)
+}
+
+
+std::string repairUTF8(const char *szIn, int len)
+{
+	Py_ssize_t sz = len;
+	PyObject * pyinput = PyUnicode_DecodeUTF8Stateful(szIn, sz, "ignore", NULL);
+	std::string res = PyUnicode_AsUTF8(pyinput);
+	Py_DECREF(pyinput);
+	return res;
 }
 
 
@@ -1118,6 +1132,18 @@ std::vector<std::string> split(std::string s, const std::string& separator)
 	}
 
 	return tokens;
+}
+
+void join_str(const std::vector<std::string>& v, char c, std::string& s) {
+
+   s.clear();
+
+   for (std::vector<std::string>::const_iterator p = v.begin();
+        p != v.end(); ++p) {
+      s += *p;
+      if (p != v.end() - 1)
+        s += c;
+   }
 }
 
 int strcasecmp(const std::string& s1, const std::string& s2)

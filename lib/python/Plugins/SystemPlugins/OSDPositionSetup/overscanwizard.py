@@ -1,13 +1,14 @@
 from Screens.Screen import Screen
+from Components.ActionMap import ActionMap
 from Components.ConfigList import ConfigListScreen
-from Components.config import config, ConfigSlider, getConfigListEntry, ConfigYesNo
+from Components.config import config, ConfigSlider, ConfigYesNo
 from Components.Label import Label
 from Plugins.SystemPlugins.OSDPositionSetup.plugin import setPosition, setConfiguredPosition
 from enigma import quitMainloop, eTimer, getDesktop
 import os
 
 
-class OverscanWizard(Screen, ConfigListScreen):
+class OverscanWizard(ConfigListScreen, Screen):
 	def __init__(self, session, timeOut=True):
 		if getDesktop(0).size().height() == 1080:
 			self.skin = """<screen position="fill" flags="wfNoBorder">
@@ -27,12 +28,7 @@ class OverscanWizard(Screen, ConfigListScreen):
 			</screen>"""
 
 		Screen.__init__(self, session)
-		self.setup_title = _("Overscan wizard")
-
-		from Components.ActionMap import ActionMap
-		from Components.Button import Button
-
-		self["title"] = Label(_("Overscan wizard"))
+		self.setTitle(_("Overscan wizard"))
 		self["introduction"] = Label()
 
 		self["actions"] = ActionMap(["SetupActions", "ColorActions", "MenuActions"],
@@ -45,8 +41,7 @@ class OverscanWizard(Screen, ConfigListScreen):
 
 		self.step = 1
 		self.list = []
-		ConfigListScreen.__init__(self, self.list, session=self.session, on_change=self.changedEntry)
-		self.onChangedEntry = []
+		ConfigListScreen.__init__(self, self.list, session)
 		self.setScreen()
 
 		self.Timer = eTimer()
@@ -82,17 +77,17 @@ class OverscanWizard(Screen, ConfigListScreen):
 				"If you see the tips of all eight arrowheads, then your TV has overscan disabled.\n\n"
 				"Test Pattern by TigerDave - www.tigerdave.com/ht_menu.htm"))
 			self.yes_no = ConfigYesNo(default=True, graphic=False)
-			self.list.append(getConfigListEntry(_("Did you see all eight arrow heads?"), self.yes_no))
+			self.list.append((_("Did you see all eight arrow heads?"), self.yes_no))
 			self.save_new_position = False
 			setPosition(0, 720, 0, 576)
 		elif self.step == 2:
 			self.Timer.stop()
-			self["title"].setText(_("Overscan wizard"))
+			self.setTitle(_("Overscan wizard"))
 			self["introduction"].setText(_("It seems you did not see all the eight arrow heads. This means your TV "
 				"has overscan enabled, and is not configured properly.\n\n"
 				"Please refer to your TV's manual to find how you can disable overscan on your TV. Look for terms like 'Just fit', 'Full width', etc. "
 				"If you can't find it, ask other users at http://forums.openpli.org.\n\n"))
-			self.list.append(getConfigListEntry(_("Did you see all eight arrow heads?"), self.yes_no))
+			self.list.append((_("Did you see all eight arrow heads?"), self.yes_no))
 			self.yes_no.value = True
 			self.save_new_position = False
 			setPosition(0, 720, 0, 576)
@@ -106,10 +101,10 @@ class OverscanWizard(Screen, ConfigListScreen):
 			self.dst_right = ConfigSlider(default=config.plugins.OSDPositionSetup.dst_left.value + config.plugins.OSDPositionSetup.dst_width.value, increment=1, limits=(0, 720))
 			self.dst_top = ConfigSlider(default=config.plugins.OSDPositionSetup.dst_top.value, increment=1, limits=(0, 576))
 			self.dst_bottom = ConfigSlider(default=config.plugins.OSDPositionSetup.dst_top.value + config.plugins.OSDPositionSetup.dst_height.value, increment=1, limits=(0, 576))
-			self.list.append(getConfigListEntry(_("left"), self.dst_left))
-			self.list.append(getConfigListEntry(_("right"), self.dst_right))
-			self.list.append(getConfigListEntry(_("top"), self.dst_top))
-			self.list.append(getConfigListEntry(_("bottom"), self.dst_bottom))
+			self.list.append((_("left"), self.dst_left))
+			self.list.append((_("right"), self.dst_right))
+			self.list.append((_("top"), self.dst_top))
+			self.list.append((_("bottom"), self.dst_bottom))
 			setConfiguredPosition()
 		elif self.step == 4:
 			self["introduction"].setText(_("You did not see all eight arrow heads. This means your TV has overscan enabled "
@@ -118,45 +113,30 @@ class OverscanWizard(Screen, ConfigListScreen):
 				"Unfortunately, your model of receiver is not capable to adjust the dimensions of the user interface. "
 				"If not everything is visible, you should change the installed skin to one that supports the overscan area of your TV.\n\n"
 				"When you select a different skin, the user interface of your receiver will restart.\n\n"
-				"Note: you can always start the Overscan wizard later,  via\n\nmenu->installation->system->Overscan wizard"))
+				"Note: you can always start the Overscan wizard later, via\n\nmenu->installation->system->Overscan wizard"))
 			self.yes_no.value = False
-			self.list.append(getConfigListEntry(_("Do you want to select a different skin?"), self.yes_no))
+			self.list.append((_("Do you want to select a different skin?"), self.yes_no))
 		elif self.step == 5:
 			self.Timer.stop()
-			self["title"].setText(_("Overscan wizard"))
+			self.setTitle(_("Overscan wizard"))
 			self["introduction"].setText(_("The overscan wizard has been completed.\n\n"
-				"Note: you can always start the Overscan wizard later,  via\n\nMenu->Installation->System->Audio/Video->Overscan wizard"))
+				"Note: you can always start the Overscan wizard later, via\n\nMenu->Installation->System->Audio/Video->Overscan wizard"))
 			self.yes_no.value = True
-			self.list.append(getConfigListEntry(_("Do you want to quit the overscan wizard?"), self.yes_no))
+			self.list.append((_("Do you want to quit the overscan wizard?"), self.yes_no))
 		elif self.step == 6:
 			config.skin.primary_skin.value = "PLi-HD/skin.xml"
 			config.save()
 			self["introduction"].setText(_("The user interface of the receiver will now restart to select the selected skin"))
 			quitMainloop(3)
 		self["config"].list = self.list
-		self["config"].l.setList(self.list)
 		if self["config"].instance:
 			self.__layoutFinished()
 
 	def TimerTimeout(self):
 		self.countdown -= 1
-		self["title"].setText(_("Overscan wizard") + " (%s)" % self.countdown)
-		if not(self.countdown):
+		self.setTitle(_("Overscan wizard") + " (%s)" % self.countdown)
+		if not (self.countdown):
 			self.keyCancel()
-
-	def changedEntry(self):
-		for x in self.onChangedEntry:
-			x()
-
-	def getCurrentEntry(self):
-		return self["config"].getCurrent() and self["config"].getCurrent()[0] or ""
-
-	def getCurrentValue(self):
-		return self["config"].getCurrent() and len(self["config"].getCurrent()) > 1 and str(self["config"].getCurrent()[1].getText()) or ""
-
-	def createSummary(self):
-		from Screens.Setup import SetupSummary
-		return SetupSummary
 
 	def keyLeft(self):
 		ConfigListScreen.keyLeft(self)
@@ -204,7 +184,7 @@ class OverscanWizard(Screen, ConfigListScreen):
 			self.dst_left.value = self.dst_right.value
 		if self.dst_top.value > self.dst_bottom.value:
 			self.dst_top.value = self.dst_bottom.value
-		self["config"].l.setList(self.list)
+		self["config"].list = self.list
 		setPosition(int(self.dst_left.value), int(self.dst_right.value) - int(self.dst_left.value), int(self.dst_top.value), int(self.dst_bottom.value) - int(self.dst_top.value))
 
 	def keyCancel(self):

@@ -1,6 +1,6 @@
 from Screens.Screen import Screen
 from Components.ConfigList import ConfigListScreen
-from Components.config import config, ConfigSubsection, ConfigInteger, ConfigSlider, getConfigListEntry
+from Components.config import config, ConfigSubsection, ConfigInteger, ConfigSlider
 
 config.plugins.VideoClippingSetup = ConfigSubsection()
 config.plugins.VideoClippingSetup.clip_left = ConfigInteger(default=0)
@@ -9,7 +9,7 @@ config.plugins.VideoClippingSetup.clip_top = ConfigInteger(default=0)
 config.plugins.VideoClippingSetup.clip_height = ConfigInteger(default=576)
 
 
-class VideoClippingCoordinates(Screen, ConfigListScreen):
+class VideoClippingCoordinates(ConfigListScreen, Screen):
 	skin = """
 	<screen position="0,0" size="e,e" title="Video clipping setup" backgroundColor="transparent">
 		<widget name="config" position="c-175,c-75" size="350,150" foregroundColor="black" backgroundColor="transparent" />
@@ -54,13 +54,12 @@ class VideoClippingCoordinates(Screen, ConfigListScreen):
 		self.clip_width = ConfigSlider(default=width, increment=self.clip_step.value, limits=(0, 720))
 		self.clip_top = ConfigSlider(default=top, increment=self.clip_step.value, limits=(0, 576))
 		self.clip_height = ConfigSlider(default=height, increment=self.clip_step.value, limits=(0, 576))
-		self.list.append(getConfigListEntry(_("stepsize"), self.clip_step))
-		self.list.append(getConfigListEntry(_("left"), self.clip_left))
-		self.list.append(getConfigListEntry(_("width"), self.clip_width))
-		self.list.append(getConfigListEntry(_("top"), self.clip_top))
-		self.list.append(getConfigListEntry(_("height"), self.clip_height))
+		self.list.append((_("stepsize"), self.clip_step))
+		self.list.append((_("left"), self.clip_left))
+		self.list.append((_("width"), self.clip_width))
+		self.list.append((_("top"), self.clip_top))
+		self.list.append((_("height"), self.clip_height))
 		self["config"].list = self.list
-		self["config"].l.setList(self.list)
 
 	def adjustStep(self):
 		self.clip_left.increment = self.clip_step.value
